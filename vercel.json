@@ -1,0 +1,5 @@
+{
+  "framework": "nextjs",
+  "regions": ["sin1"],
+  "buildCommand": "npx tsx scripts/use-db.ts postgres && prisma generate && prisma db push && next build"
+}

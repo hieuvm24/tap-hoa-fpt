@@ -1,0 +1,329 @@
+const BASE = "/api";
+
+async function request<T>(
+  path: string,
+  options?: RequestInit
+): Promise<{ success: boolean; data?: T; error?: string }> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+    credentials: "include",
+  });
+  return res.json();
+}
+
+export const api = {
+  upload: async (
+    file: File,
+    folder: "products" | "avatars" | "news" | "promotions" = "products"
+  ) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
+    const res = await fetch(`${BASE}/upload`, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+    return res.json() as Promise<{
+      success: boolean;
+      data?: { url: string; filename: string };
+      error?: string;
+    }>;
+  },
+
+  auth: {
+    login: (email: string, password: string) =>
+      request<{ user: import("@/types/auth").AuthUser; redirect?: string }>(
+        "/auth/login",
+        { method: "POST", body: JSON.stringify({ email, password }) }
+      ),
+    register: (data: import("@/types/auth").RegisterData) =>
+      request<{ user: import("@/types/auth").AuthUser }>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    logout: () => request("/auth/logout", { method: "POST" }),
+    me: () =>
+      request<{ user: import("@/types/auth").AuthUser }>("/auth/me"),
+    updateProfile: (data: { name?: string; phone?: string; avatar?: string }) =>
+      request<{ user: import("@/types/auth").AuthUser }>("/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      request<{ user: import("@/types/auth").AuthUser; passwordChanged: boolean }>(
+        "/auth/me",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ currentPassword, newPassword }),
+        }
+      ),
+  },
+
+  products: {
+    list: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<{
+        products: import("@/types").Product[];
+        total: number;
+        brands: string[];
+      }>(`/products${qs}`);
+    },
+    featured: () =>
+      request<import("@/types").Product[]>("/products?featured=true"),
+    getBySlug: (slug: string) =>
+      request<{
+        product: import("@/types").Product;
+        reviews: import("@/types").Review[];
+      }>(`/products/slug/${slug}`),
+    create: (data: Record<string, unknown>) =>
+      request<import("@/types").Product>("/products", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Record<string, unknown>) =>
+      request<import("@/types").Product>(`/products/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request(`/products/${id}`, { method: "DELETE" }),
+  },
+
+  categories: {
+    list: () => request<import("@/types").Category[]>("/categories"),
+    create: (data: { name: string; slug: string; icon?: string }) =>
+      request<import("@/types").Category>("/categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Record<string, unknown>) =>
+      request<import("@/types").Category>(`/categories/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request(`/categories/${id}`, { method: "DELETE" }),
+  },
+
+  orders: {
+    list: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<import("@/types").Order[]>(`/orders${qs}`);
+    },
+    create: (data: Record<string, unknown>) =>
+      request<import("@/types").Order>("/orders", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateStatus: (id: string, status: string, note?: string) =>
+      request<import("@/types").Order>(`/orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, note }),
+      }),
+    cancel: (id: string, note?: string) =>
+      request<import("@/types").Order>(`/orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "cancel", note }),
+      }),
+  },
+
+  promotions: {
+    list: (all = false) =>
+      request<import("@/types").Promotion[]>(
+        `/promotions${all ? "?all=true" : ""}`
+      ),
+    create: (data: Record<string, unknown>) =>
+      request<import("@/types").Promotion>("/promotions", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Record<string, unknown>) =>
+      request<import("@/types").Promotion>(`/promotions/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request(`/promotions/${id}`, { method: "DELETE" }),
+  },
+
+  vouchers: {
+    validate: (code: string, subtotal: number) =>
+      request<{ discount: number; code: string }>("/vouchers/validate", {
+        method: "POST",
+        body: JSON.stringify({ code, subtotal }),
+      }),
+    list: () =>
+      request<
+        {
+          id: string;
+          code: string;
+          discount: number;
+          minOrder: number;
+          isActive: boolean;
+        }[]
+      >("/vouchers"),
+    create: (data: Record<string, unknown>) =>
+      request("/vouchers", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: Record<string, unknown>) =>
+      request(`/vouchers/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      request(`/vouchers/${id}`, { method: "DELETE" }),
+  },
+
+  wishlist: {
+    list: () =>
+      request<
+        {
+          id: string;
+          productId: string;
+          product: import("@/types").Product;
+        }[]
+      >("/wishlist"),
+    add: (productId: string) =>
+      request("/wishlist", {
+        method: "POST",
+        body: JSON.stringify({ productId }),
+      }),
+    remove: (productId: string) =>
+      request(`/wishlist?productId=${productId}`, { method: "DELETE" }),
+  },
+
+  reviews: {
+    list: (productId?: string) =>
+      request<import("@/types").Review[]>(
+        `/reviews${productId ? `?productId=${productId}` : ""}`
+      ),
+    create: (data: { productId: string; rating: number; comment: string }) =>
+      request<import("@/types").Review>("/reviews", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  recommendations: {
+    get: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<{
+        type: string;
+        products: import("@/types").Product[];
+      }>(`/recommendations${qs}`);
+    },
+  },
+
+  ai: {
+    chat: (
+      message: string,
+      history?: { role: "user" | "assistant"; content: string }[]
+    ) =>
+      request<{
+        text: string;
+        products?: import("@/types").Product[];
+        source: "openai" | "rules";
+      }>("/ai/chat", {
+        method: "POST",
+        body: JSON.stringify({ message, history }),
+      }),
+  },
+
+  payments: {
+    createVnpay: (data: { orderId?: string; orderCode?: string }) =>
+      request<{
+        paymentUrl: string;
+        txnRef: string;
+        demo: boolean;
+        orderCode: string;
+        amount: number;
+      }>("/payments/vnpay/create", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  addresses: {
+    list: () => request<import("@/types").Address[]>("/addresses"),
+    create: (data: Partial<import("@/types").Address>) =>
+      request<import("@/types").Address>("/addresses", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<import("@/types").Address>) =>
+      request<import("@/types").Address>(`/addresses/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request(`/addresses/${id}`, { method: "DELETE" }),
+  },
+
+  news: {
+    list: (all = false) =>
+      request<import("@/types").NewsArticle[]>(
+        `/news${all ? "?all=true" : ""}`
+      ),
+    get: (idOrSlug: string) =>
+      request<import("@/types").NewsArticle>(`/news/${idOrSlug}`),
+    create: (data: Record<string, unknown>) =>
+      request<import("@/types").NewsArticle>("/news", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Record<string, unknown>) =>
+      request<import("@/types").NewsArticle>(`/news/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request(`/news/${id}`, { method: "DELETE" }),
+  },
+
+  authForgot: {
+    request: (email: string) =>
+      request<{
+        sent: boolean;
+        message: string;
+        resetUrl?: string;
+        demo?: boolean;
+      }>("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    reset: (token: string, newPassword: string) =>
+      request<{ reset: boolean }>("/auth/forgot-password", {
+        method: "PUT",
+        body: JSON.stringify({ token, newPassword }),
+      }),
+  },
+
+  customers: {
+    list: () => request<import("@/types").Customer[]>("/customers"),
+  },
+
+  dashboard: {
+    stats: () =>
+      request<{
+        stats: import("@/types").DashboardStats;
+        revenueChart: import("@/types").ChartData[];
+        ordersChart: import("@/types").ChartData[];
+      }>("/dashboard/stats"),
+    reports: () =>
+      request<{
+        monthlyRevenue: import("@/types").ChartData[];
+        topProducts: import("@/types").ChartData[];
+        topCustomers: import("@/types").ChartData[];
+      }>("/dashboard/reports"),
+  },
+
+  store: {
+    get: () => request<import("@/types").StoreInfo>("/store"),
+    update: (data: Partial<import("@/types").StoreInfo>) =>
+      request<import("@/types").StoreInfo>("/store", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  },
+};
