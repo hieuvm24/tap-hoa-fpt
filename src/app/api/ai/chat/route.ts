@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
     prisma.product.findMany({
       where: { status: "ACTIVE" },
       include: { category: true },
-      take: 80,
-      orderBy: { rating: "desc" },
+      take: 120,
+      orderBy: [{ isFeatured: "desc" }, { rating: "desc" }],
     }),
     prisma.promotion.findMany({
       where: { endDate: { gte: new Date() } },

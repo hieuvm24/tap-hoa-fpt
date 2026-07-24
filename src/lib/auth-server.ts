@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import type { UserRole } from "@/types/auth";
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "taphoa-anphu-dev-secret"
+  process.env.JWT_SECRET || "taphoa-fpt-dev-secret"
 );
 const COOKIE_NAME = "taphoa_token";
 const TOKEN_EXPIRY = "7d";

@@ -123,12 +123,9 @@ export function ChatBot() {
             setIsMinimized(false);
           }}
           className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary-500 text-white shadow-lg shadow-primary-500/30 transition-all hover:scale-105 hover:bg-primary-600 animate-fade-in"
-          aria-label="Mở chatbot"
+          aria-label="Nhắn tin hỗ trợ"
         >
           <MessageCircle className="h-6 w-6" />
-          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold">
-            1
-          </span>
         </button>
       )}
 
@@ -149,8 +146,8 @@ export function ChatBot() {
                 <Bot className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-sm font-semibold">{storeName} AI</p>
-                <p className="text-xs text-primary-100">Trợ lý AI • Tư vấn sản phẩm</p>
+                <p className="text-sm font-semibold">Hỗ trợ {storeName}</p>
+                <p className="text-xs text-primary-100">Tư vấn & đặt hàng online</p>
               </div>
             </div>
             <div className="flex gap-1">

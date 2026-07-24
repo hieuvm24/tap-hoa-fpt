@@ -1,5 +1,5 @@
 {
-  "name": "tap-hoa-nong-thon",
+  "name": "tap-hoa-fpt",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,8 +14,6 @@
     "db:setup": "prisma db push && tsx prisma/seed.ts",
     "db:sqlite": "tsx scripts/use-db.ts sqlite && prisma generate",
     "db:postgres": "tsx scripts/use-db.ts postgres && prisma generate",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down",
     "check": "tsx scripts/final-check.ts",
     "postinstall": "prisma generate"
   },

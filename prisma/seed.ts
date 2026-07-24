@@ -197,7 +197,7 @@ async function main() {
       {
         title: "Thanh toán VNPay & AI tư vấn sản phẩm",
         slug: "vnpay-va-ai",
-        excerpt: "Hỗ trợ thanh toán VNPay và chatbot AI gợi ý sản phẩm.",
+        excerpt: "Thanh toán VNPay và hỗ trợ chat tư vấn sản phẩm ngay trên web.",
         content: "Khách hàng có thể thanh toán qua VNPay và chat với trợ lý AI...",
         image: productImages.sua,
       },

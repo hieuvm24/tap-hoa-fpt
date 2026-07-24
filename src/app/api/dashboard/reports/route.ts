@@ -10,44 +10,54 @@ export async function GET() {
 
   const monthLabels = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
   const currentYear = new Date().getFullYear();
+  const now = new Date();
 
-  const monthlyRevenue = await Promise.all(
-    monthLabels.map(async (label, i) => {
-      const start = new Date(currentYear, i, 1);
-      const end = new Date(currentYear, i + 1, 1);
-      const orders = await prisma.order.findMany({
-        where: { createdAt: { gte: start, lt: end }, status: { not: "cancelled" } },
-      });
-      return { label, value: orders.reduce((s, o) => s + o.total, 0) };
-    })
-  );
+  // Chỉ hiện đến tháng hiện tại cho dễ đọc
+  const monthsToShow = now.getMonth() + 1;
+
+  const yearStart = new Date(currentYear, 0, 1);
+  const yearOrders = await prisma.order.findMany({
+    where: {
+      createdAt: { gte: yearStart, lt: now },
+      status: { not: "cancelled" },
+    },
+    select: { total: true, createdAt: true, userId: true, customerName: true },
+  });
+
+  const monthlyRevenue = monthLabels.slice(0, monthsToShow).map((label, i) => {
+    const value = yearOrders
+      .filter((o) => o.createdAt.getMonth() === i)
+      .reduce((s, o) => s + o.total, 0);
+    return { label, value };
+  });
 
   const topProductsRaw = await prisma.orderItem.groupBy({
     by: ["productName"],
     _sum: { quantity: true },
     orderBy: { _sum: { quantity: "desc" } },
-    take: 5,
+    take: 8,
   });
 
   const topProducts = topProductsRaw.map((p) => ({
-    label: p.productName.length > 20 ? p.productName.slice(0, 20) + "..." : p.productName,
+    label: p.productName.length > 28 ? p.productName.slice(0, 28) + "…" : p.productName,
     value: p._sum.quantity || 0,
   }));
 
-  const customers = await prisma.user.findMany({ where: { role: "CUSTOMER" } });
-  const topCustomersData = await Promise.all(
-    customers.map(async (u) => {
-      const orders = await prisma.order.findMany({
-        where: { userId: u.id, status: { not: "cancelled" } },
-      });
-      return { label: u.name, value: orders.reduce((s, o) => s + o.total, 0) };
-    })
-  );
-  topCustomersData.sort((a, b) => b.value - a.value);
+  // Top khách theo tổng chi tiêu (chỉ khách có đơn)
+  const spendByUser = new Map<string, { label: string; value: number }>();
+  for (const o of yearOrders) {
+    if (!o.userId) continue;
+    const prev = spendByUser.get(o.userId);
+    if (prev) prev.value += o.total;
+    else spendByUser.set(o.userId, { label: o.customerName, value: o.total });
+  }
+  const topCustomers = [...spendByUser.values()]
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
 
   return apiSuccess({
     monthlyRevenue,
     topProducts,
-    topCustomers: topCustomersData.slice(0, 5),
+    topCustomers,
   });
 }

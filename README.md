@@ -32,13 +32,13 @@ Tóm tắt: tạo Neon + Cloudinary → đẩy GitHub → Import Vercel → đi�
 - Next.js 15 App Router, React 19, TypeScript, Tailwind
 - Prisma ORM — **SQLite local**, **Postgres trên Vercel**
 - Upload: local `public/uploads` / **Cloudinary** khi deploy
-- JWT auth, recommendation, AI chatbot, VNPay
+- JWT auth, gợi ý sản phẩm, chat hỗ trợ khách, VNPay
 
 ## Scripts
 
 | Lệnh | Việc |
 |------|------|
 | `npm run db:sqlite` | Dùng SQLite (local) |
-| `npm run db:postgres` | Dùng Postgres (Neon/Docker) |
+| `npm run db:postgres` | Dùng Postgres (Neon) |
 | `npm run db:setup` | `db push` + seed |
 | `npm run build` | Build kiểu Vercel (Postgres) |
