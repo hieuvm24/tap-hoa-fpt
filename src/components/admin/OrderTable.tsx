@@ -16,7 +16,11 @@ const statusConfig: Record<OrderStatus, { label: string; variant: "default" | "s
   cancelled: { label: "Đã hủy", variant: "danger" },
 };
 
-const paymentLabels = { cod: "COD", transfer: "Chuyển khoản", vnpay: "VNPay" };
+const paymentLabels = {
+  cod: "Khi nhận hàng",
+  transfer: "Chuyển khoản",
+  vnpay: "VNPay",
+};
 
 export function OrderTable() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -33,10 +37,15 @@ export function OrderTable() {
   useEffect(() => { loadOrders(); }, []);
 
   const handleStatusUpdate = async (id: string, status: OrderStatus) => {
-    const res = await api.orders.updateStatus(id, status);
+    const res =
+      status === "cancelled"
+        ? await api.orders.cancel(id, "Cửa hàng hủy đơn")
+        : await api.orders.updateStatus(id, status);
     if (res.success && res.data) {
       setSelectedOrder(res.data);
       loadOrders();
+    } else if (!res.success) {
+      alert(res.error || "Cập nhật thất bại");
     }
   };
 

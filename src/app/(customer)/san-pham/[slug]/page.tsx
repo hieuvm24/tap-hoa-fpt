@@ -215,6 +215,9 @@ function ProductDetailContent({ slug }: { slug: string }) {
             </div>
             <div className="border-t pt-4 space-y-3">
               <h3 className="font-medium text-sm">Viết đánh giá</h3>
+              <p className="text-xs text-gray-500">
+                Chỉ khách đã mua và nhận hàng thành công mới gửi được đánh giá (mỗi SP một lần).
+              </p>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Số sao:</span>
                 <select

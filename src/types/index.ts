@@ -50,6 +50,9 @@ export interface Promotion {
   image: string;
   discount: number;
   endDate: string;
+  /** percent | bogo | banner */
+  ruleType: "percent" | "bogo" | "banner";
+  categorySlug?: string | null;
 }
 
 export interface Order {
@@ -67,6 +70,8 @@ export interface Order {
   paymentMethod: "cod" | "transfer" | "vnpay";
   paymentStatus: "pending" | "paid" | "failed";
   paymentTxnRef?: string;
+  /** delivery = giao tận nơi | pickup = đến lấy tại quầy */
+  fulfillmentType: "delivery" | "pickup";
   address: string;
   note?: string;
   createdAt: string;

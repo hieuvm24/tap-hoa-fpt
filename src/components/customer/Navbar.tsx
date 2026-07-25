@@ -60,7 +60,7 @@ export function Navbar() {
             </div>
             <div className="hidden sm:block">
               <span className="text-lg font-bold text-gray-900">{storeName}</span>
-              <p className="text-xs text-primary-600 leading-none">Tạp hóa nông thôn</p>
+              <p className="text-xs text-primary-600 leading-none">Online & tại quầy</p>
             </div>
           </Link>
 

@@ -28,6 +28,9 @@ type Item = {
   specs?: Record<string, string>;
 };
 
+/** [tên SP, từ khóa OFF, giá cơ sở] */
+type CatalogRow = [name: string, search: string, base: number];
+
 function slugify(s: string) {
   return s
     .toLowerCase()
@@ -186,7 +189,7 @@ function buildCatalog(): Item[] {
     });
   });
 
-  const noodles = [
+  const noodles: CatalogRow[] = [
     ["Hảo Hảo tôm chua cay", "hao hao", 4500],
     ["Hảo Hảo sa tế hành", "hao hao", 4500],
     ["Omachi bò hầm", "omachi", 8000],
@@ -207,7 +210,7 @@ function buildCatalog(): Item[] {
   noodles.forEach(([name, search, base], i) => {
     const { price, originalPrice } = money(base, i);
     items.push({
-      name: `Mì/phở ${name}`,
+      name: String(name),
       slug: slugify(`mi-${name}-${i}`),
       description: `${name} — hàng ăn liền bán chạy ở tiệm.`,
       price,
@@ -224,7 +227,7 @@ function buildCatalog(): Item[] {
     });
   });
 
-  const milks = [
+  const milks: CatalogRow[] = [
     ["Vinamilk không đường 1L", "vinamilk", 32000],
     ["Vinamilk có đường 1L", "vinamilk", 32000],
     ["TH True Milk 1L", "th true milk", 36000],
@@ -245,7 +248,7 @@ function buildCatalog(): Item[] {
   milks.forEach(([name, search, base], i) => {
     const { price, originalPrice } = money(base, i);
     items.push({
-      name: `Sữa ${name}`,
+      name: String(name),
       slug: slugify(`sua-${name}-${i}`),
       description: `${name} — dùng hàng ngày, có tại quầy.`,
       price,
@@ -261,7 +264,7 @@ function buildCatalog(): Item[] {
     });
   });
 
-  const spices = [
+  const spices: CatalogRow[] = [
     ["Nước mắm Nam Ngư", "nam ngu", 42000],
     ["Nước mắm Chinsu", "chinsu fish sauce", 38000],
     ["Nước tương Maggi", "maggi soy", 28000],
@@ -304,7 +307,7 @@ function buildCatalog(): Item[] {
     });
   });
 
-  const snacks = [
+  const snacks: CatalogRow[] = [
     ["Oreo", "oreo", 22000],
     ["Cosy", "cosy biscuit", 28000],
     ["AFC", "afc biscuit", 25000],
@@ -325,7 +328,7 @@ function buildCatalog(): Item[] {
   snacks.forEach(([name, search, base], i) => {
     const { price, originalPrice } = money(base, i);
     items.push({
-      name: `Bánh/kẹo ${name}`,
+      name: String(name),
       slug: slugify(`bk-${name}-${i}`),
       description: `${name} — ăn vặt bán chạy.`,
       price,
@@ -340,7 +343,7 @@ function buildCatalog(): Item[] {
     });
   });
 
-  const frozen = [
+  const frozen: CatalogRow[] = [
     ["Xúc xích CP", "sausage", 55000],
     ["Há cảo CP", "dumpling", 62000],
     ["Chả giò", "spring roll", 52000],
@@ -372,7 +375,7 @@ function buildCatalog(): Item[] {
     });
   });
 
-  const household = [
+  const household: CatalogRow[] = [
     ["OMO", "omo detergent", 95000],
     ["Ariel", "ariel detergent", 98000],
     ["Comfort", "comfort softener", 135000],
@@ -393,7 +396,7 @@ function buildCatalog(): Item[] {
   household.forEach(([name, search, base], i) => {
     const { price, originalPrice } = money(base, i);
     items.push({
-      name: `Đồ gia dụng ${name}`,
+      name: String(name),
       slug: slugify(`gd-${name}-${i}`),
       description: `${name} — đồ dùng nhà cửa bán tại tạp hóa.`,
       price,
@@ -408,7 +411,7 @@ function buildCatalog(): Item[] {
     });
   });
 
-  const personal = [
+  const personal: CatalogRow[] = [
     ["Head & Shoulders", "head shoulders shampoo", 65000],
     ["Clear Men", "clear shampoo", 72000],
     ["Pantene", "pantene", 78000],
@@ -429,7 +432,7 @@ function buildCatalog(): Item[] {
   personal.forEach(([name, search, base], i) => {
     const { price, originalPrice } = money(base, i);
     items.push({
-      name: `CS cá nhân ${name}`,
+      name: String(name),
       slug: slugify(`cn-${name}-${i}`),
       description: `${name} — chăm sóc cá nhân dùng hàng ngày.`,
       price,

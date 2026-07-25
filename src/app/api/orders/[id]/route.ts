@@ -10,6 +10,50 @@ const orderInclude = {
 
 const CANCELLABLE = new Set(["pending", "confirmed"]);
 
+async function cancelOrder(
+  id: string,
+  existing: {
+    status: string;
+    items: { productId: string; quantity: number }[];
+  },
+  note: string | undefined,
+  isAdmin: boolean
+) {
+  if (!CANCELLABLE.has(existing.status)) {
+    return null;
+  }
+
+  return prisma.$transaction(async (tx) => {
+    for (const item of existing.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: { increment: item.quantity },
+          soldCount: { decrement: item.quantity },
+        },
+      });
+      // Không để soldCount âm
+      await tx.product.updateMany({
+        where: { id: item.productId, soldCount: { lt: 0 } },
+        data: { soldCount: 0 },
+      });
+    }
+    return tx.order.update({
+      where: { id },
+      data: {
+        status: "cancelled",
+        timeline: {
+          create: {
+            status: "cancelled",
+            note: note || (isAdmin ? "Cửa hàng hủy đơn" : "Khách hủy đơn"),
+          },
+        },
+      },
+      include: orderInclude,
+    });
+  });
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -51,50 +95,45 @@ export async function PATCH(
   const isAdmin = isAdminRole(session.role);
   const isOwner = existing.userId === session.userId;
 
-  // Customer cancel
-  if (action === "cancel" || (status === "cancelled" && !isAdmin)) {
+  const wantsCancel =
+    action === "cancel" || status === "cancelled";
+
+  if (wantsCancel) {
     if (!isOwner && !isAdmin) return apiError("Forbidden", 403);
-    if (!CANCELLABLE.has(existing.status)) {
+    const order = await cancelOrder(id, existing, note, isAdmin);
+    if (!order) {
       return apiError("Đơn hàng không thể hủy ở trạng thái hiện tại");
     }
-
-    const order = await prisma.$transaction(async (tx) => {
-      for (const item of existing.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
-      }
-      return tx.order.update({
-        where: { id },
-        data: {
-          status: "cancelled",
-          timeline: {
-            create: {
-              status: "cancelled",
-              note: note || (isAdmin ? "Admin hủy đơn" : "Khách hủy đơn"),
-            },
-          },
-        },
-        include: orderInclude,
-      });
-    });
-
     return apiSuccess(mapOrder(order));
   }
 
   if (!isAdmin) return apiError("Forbidden", 403);
 
+  // COD/CK: khi giao xong hoặc khách đã lấy → đánh dấu đã thu tiền (nếu chưa failed)
+  let nextPayment = paymentStatus as string | undefined;
+  if (
+    status === "delivered" &&
+    !nextPayment &&
+    existing.paymentStatus === "pending" &&
+    (existing.paymentMethod === "cod" || existing.paymentMethod === "transfer")
+  ) {
+    nextPayment = "paid";
+  }
+
   const order = await prisma.order.update({
     where: { id },
     data: {
       ...(status && { status: status as string }),
-      ...(paymentStatus && { paymentStatus }),
+      ...(nextPayment && { paymentStatus: nextPayment }),
       ...(status && {
         timeline: {
           create: {
             status: status as string,
-            note: note || undefined,
+            note:
+              note ||
+              (status === "delivered" && existing.fulfillmentType === "pickup"
+                ? "Khách đã nhận tại quầy"
+                : undefined),
           },
         },
       }),

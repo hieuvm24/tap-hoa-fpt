@@ -16,8 +16,8 @@ export const DEFAULT_STORE: StoreInfo = {
   longitude: 105.92,
   mapEmbedUrl: null,
   bankName: "Vietcombank",
-  bankAccount: "0123456789",
-  bankOwner: "TAP HOA FPT",
+  bankAccount: "0388025515",
+  bankOwner: "VU MINH HIEU",
 };
 
 export const FREE_SHIP_THRESHOLD = 200000;

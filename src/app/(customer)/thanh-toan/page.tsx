@@ -4,26 +4,33 @@ import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CreditCard, Banknote, LogIn, QrCode } from "lucide-react";
+import { CreditCard, Banknote, LogIn, QrCode, Truck, Store } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import { Button, Card, Input, Textarea } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { api } from "@/lib/api";
-import type { Address, StoreInfo } from "@/types";
+import { FREE_SHIP_THRESHOLD, SHIPPING_FEE, DEFAULT_STORE } from "@/config/defaults";
+import { calcPromotionDiscount } from "@/lib/promotions";
+import type { Address, Promotion, StoreInfo } from "@/types";
 
 type PaymentMethod = "cod" | "transfer" | "vnpay";
+type Fulfillment = "delivery" | "pickup";
 
 function CheckoutContent() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [fulfillment, setFulfillment] = useState<Fulfillment>("delivery");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoLabels, setPromoLabels] = useState<string[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [store, setStore] = useState<StoreInfo | null>(null);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const { isAuthenticated, user } = useAuth();
   const { items, subtotal, clearCart } = useCart();
   const router = useRouter();
@@ -41,7 +48,30 @@ function CheckoutContent() {
     api.store.get().then((res) => {
       if (res.success && res.data) setStore(res.data);
     });
+    api.promotions.list().then((res) => {
+      if (res.success && res.data) setPromotions(res.data);
+    });
   }, []);
+
+  useEffect(() => {
+    const { amount, labels } = calcPromotionDiscount(
+      promotions.map((p) => ({
+        title: p.title,
+        discount: p.discount,
+        ruleType: p.ruleType,
+        categorySlug: p.categorySlug ?? null,
+      })),
+      items
+        .filter((i) => i.categorySlug)
+        .map((i) => ({
+          categorySlug: i.categorySlug!,
+          price: i.price,
+          quantity: i.quantity,
+        }))
+    );
+    setPromoDiscount(amount);
+    setPromoLabels(labels);
+  }, [items, promotions]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -66,8 +96,15 @@ function CheckoutContent() {
     }
   }, [voucherCode, subtotal]);
 
-  const shippingFee = subtotal >= 200000 ? 0 : 15000;
-  const total = subtotal + shippingFee - discount;
+  const shippingFee =
+    fulfillment === "pickup"
+      ? 0
+      : subtotal >= FREE_SHIP_THRESHOLD
+        ? 0
+        : SHIPPING_FEE;
+  const totalDiscount = Math.min(subtotal, discount + promoDiscount);
+  const total = subtotal + shippingFee - totalDiscount;
+  const storeAddress = store?.address || DEFAULT_STORE.address;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,9 +114,13 @@ function CheckoutContent() {
       customerName,
       customerPhone,
       customerEmail: user?.email,
-      address,
+      address: fulfillment === "pickup" ? storeAddress : address,
       note,
-      paymentMethod,
+      paymentMethod:
+        fulfillment === "pickup" && paymentMethod === "cod"
+          ? "cod"
+          : paymentMethod,
+      fulfillmentType: fulfillment,
       voucherCode: voucherCode || undefined,
       items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
     });
@@ -90,22 +131,32 @@ function CheckoutContent() {
       return;
     }
 
-    clearCart();
+    const orderCode = res.data.orderCode;
 
     if (paymentMethod === "vnpay") {
-      const pay = await api.payments.createVnpay({ orderCode: res.data.orderCode });
+      const pay = await api.payments.createVnpay({ orderCode });
       setIsSubmitting(false);
       if (pay.success && pay.data?.paymentUrl) {
+        clearCart();
         window.location.href = pay.data.paymentUrl;
         return;
       }
-      alert(pay.error || "Không tạo được link VNPay. Đơn đã được lưu, bạn có thể thanh toán sau.");
-      router.push(`/don-hang?code=${res.data.orderCode}`);
+      alert(
+        pay.error ||
+          "Không tạo được link VNPay. Đơn đã được lưu — bạn có thể thanh toán sau hoặc chọn COD."
+      );
+      clearCart();
+      router.push(
+        `/don-hang?code=${orderCode}&phone=${encodeURIComponent(customerPhone)}`
+      );
       return;
     }
 
+    clearCart();
     setIsSubmitting(false);
-    router.push(`/don-hang?code=${res.data.orderCode}`);
+    router.push(
+      `/don-hang?code=${orderCode}&phone=${encodeURIComponent(customerPhone)}`
+    );
   };
 
   if (!items.length) {
@@ -126,7 +177,7 @@ function CheckoutContent() {
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
           <p className="text-sm text-primary-800">
             <LogIn className="inline h-4 w-4 mr-1" />
-            Đăng nhập để theo dõi đơn hàng dễ dàng hơn
+            Đăng nhập để lưu địa chỉ và xem lịch sử đơn. Khách vãng lai vẫn đặt được — tra cứu bằng mã đơn + SĐT.
           </p>
           <Link href="/dang-nhap?redirect=/thanh-toan">
             <Button size="sm" variant="outline">
@@ -139,8 +190,47 @@ function CheckoutContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card>
-              <h2 className="text-lg font-semibold mb-4">Thông tin giao hàng</h2>
-              {addresses.length > 0 && (
+              <h2 className="text-lg font-semibold mb-4">Hình thức nhận hàng</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setFulfillment("delivery")}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border-2 p-4 text-left",
+                    fulfillment === "delivery"
+                      ? "border-primary-500 bg-primary-50"
+                      : "border-gray-200"
+                  )}
+                >
+                  <Truck className="h-6 w-6 text-primary-600 shrink-0" />
+                  <div>
+                    <p className="font-medium">Giao tận nơi</p>
+                    <p className="text-xs text-gray-500">
+                      Phí {formatPrice(SHIPPING_FEE)} · miễn phí từ{" "}
+                      {FREE_SHIP_THRESHOLD / 1000}K
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFulfillment("pickup")}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border-2 p-4 text-left",
+                    fulfillment === "pickup"
+                      ? "border-primary-500 bg-primary-50"
+                      : "border-gray-200"
+                  )}
+                >
+                  <Store className="h-6 w-6 text-primary-600 shrink-0" />
+                  <div>
+                    <p className="font-medium">Đến lấy tại quầy</p>
+                    <p className="text-xs text-gray-500">Không tính phí ship</p>
+                  </div>
+                </button>
+              </div>
+
+              <h2 className="text-lg font-semibold mb-4">Thông tin người nhận</h2>
+              {fulfillment === "delivery" && addresses.length > 0 && (
                 <div className="mb-4 space-y-2">
                   <p className="text-sm text-gray-500">Chọn địa chỉ đã lưu</p>
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -179,18 +269,34 @@ function CheckoutContent() {
                   onChange={(e) => setCustomerPhone(e.target.value)}
                 />
               </div>
-              <div className="mt-4">
-                <Input
-                  label="Địa chỉ giao hàng"
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                />
-              </div>
+              {fulfillment === "delivery" ? (
+                <div className="mt-4">
+                  <Input
+                    label="Địa chỉ giao hàng"
+                    required
+                    placeholder="Thôn/xóm, xã, huyện Gia Viễn..."
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-900">
+                  <p className="font-medium mb-1">Nhận tại cửa hàng</p>
+                  <p>{storeAddress}</p>
+                  <p className="text-emerald-700 mt-1">
+                    Giờ mở cửa: {store?.openHours || DEFAULT_STORE.openHours}
+                  </p>
+                </div>
+              )}
               <div className="mt-4">
                 <Textarea
                   label="Ghi chú"
                   rows={3}
+                  placeholder={
+                    fulfillment === "pickup"
+                      ? "VD: Lấy sau 17h, gọi trước khi đến..."
+                      : "VD: Gọi trước khi giao..."
+                  }
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                 />
@@ -211,8 +317,10 @@ function CheckoutContent() {
                 >
                   <Banknote className="h-6 w-6 text-primary-600" />
                   <div className="text-left">
-                    <p className="font-medium">COD</p>
-                    <p className="text-xs text-gray-500">Khi nhận hàng</p>
+                    <p className="font-medium">
+                      {fulfillment === "pickup" ? "Trả tại quầy" : "Khi nhận hàng"}
+                    </p>
+                    <p className="text-xs text-gray-500">Tiền mặt</p>
                   </div>
                 </button>
                 <button
@@ -252,25 +360,24 @@ function CheckoutContent() {
                 <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm space-y-1">
                   <p>
                     <span className="text-gray-500">Ngân hàng:</span>{" "}
-                    <strong>{store.bankName || "Vietcombank"}</strong>
+                    <strong>{store.bankName || DEFAULT_STORE.bankName}</strong>
                   </p>
                   <p>
                     <span className="text-gray-500">STK:</span>{" "}
-                    <strong>{store.bankAccount || "0123456789"}</strong>
+                    <strong>{store.bankAccount || DEFAULT_STORE.bankAccount}</strong>
                   </p>
                   <p>
                     <span className="text-gray-500">Chủ TK:</span>{" "}
-                    <strong>{store.bankOwner || "TAP HOA FPT"}</strong>
+                    <strong>{store.bankOwner || DEFAULT_STORE.bankOwner}</strong>
                   </p>
                   <p className="text-gray-500 pt-1">
-                    Nội dung CK: mã đơn hàng (hiển thị sau khi đặt)
+                    Nội dung CK: mã đơn hàng (hiển thị sau khi đặt). Có thể cập nhật STK trong Cài đặt cửa hàng.
                   </p>
                 </div>
               )}
               {paymentMethod === "vnpay" && (
                 <p className="mt-3 text-sm text-gray-500">
-                  Sau khi đặt hàng, bạn sẽ được chuyển tới cổng VNPay để thanh toán
-                  an toàn. (Chế độ demo hoạt động khi chưa cấu hình khóa sandbox.)
+                  Sau khi đặt hàng bạn sẽ chuyển tới cổng VNPay. Nếu chưa cấu hình khóa thật, hệ thống dùng chế độ demo cho đồ án.
                 </p>
               )}
             </Card>
@@ -299,12 +406,22 @@ function CheckoutContent() {
                   <span>{formatPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Phí giao hàng</span>
+                  <span className="text-gray-500">
+                    {fulfillment === "pickup" ? "Phí nhận tại quầy" : "Phí giao hàng"}
+                  </span>
                   <span>{shippingFee === 0 ? "Miễn phí" : formatPrice(shippingFee)}</span>
                 </div>
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span className="truncate pr-2">
+                      KM {promoLabels[0] || ""}
+                    </span>
+                    <span>-{formatPrice(promoDiscount)}</span>
+                  </div>
+                )}
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>Giảm giá</span>
+                    <span>Voucher</span>
                     <span>-{formatPrice(discount)}</span>
                   </div>
                 )}

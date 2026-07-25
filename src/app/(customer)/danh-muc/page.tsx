@@ -16,7 +16,7 @@ function CategoryPageContent() {
   const categorySlug = searchParams.get("category");
   const searchQuery = searchParams.get("search") || "";
   const [sort, setSort] = useState<SortOption>("newest");
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, Number.MAX_SAFE_INTEGER]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState(categorySlug || "");
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,7 +40,7 @@ function CategoryPageContent() {
   useEffect(() => {
     setLoading(true);
     setCurrentPage(1);
-    const params: Record<string, string> = { limit: "100" };
+    const params: Record<string, string> = { limit: "500" };
     if (selectedCategory) params.category = selectedCategory;
     if (searchQuery) params.search = searchQuery;
     if (sort !== "newest") params.sort = sort;
@@ -128,9 +128,11 @@ function CategoryPageContent() {
               <h3 className="font-semibold text-gray-900 mb-3">Giá</h3>
               <div className="space-y-2">
                 {[
+                  { label: "Tất cả mức giá", min: 0, max: Number.MAX_SAFE_INTEGER },
                   { label: "Dưới 20.000đ", min: 0, max: 20000 },
                   { label: "20.000 - 50.000đ", min: 20000, max: 50000 },
-                  { label: "Trên 50.000đ", min: 50000, max: 100000 },
+                  { label: "50.000 - 100.000đ", min: 50000, max: 100000 },
+                  { label: "Trên 100.000đ", min: 100000, max: Number.MAX_SAFE_INTEGER },
                 ].map((range) => (
                   <label key={range.label} className="flex items-center gap-2 text-sm cursor-pointer">
                     <input

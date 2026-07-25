@@ -4,6 +4,7 @@ import { getSession, isAdminRole } from "@/lib/auth-server";
 import { mapProduct, mapCategory, apiSuccess, apiError } from "@/lib/mappers";
 
 export async function GET(req: NextRequest) {
+  const session = await getSession();
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category");
   const featured = searchParams.get("featured");
@@ -14,10 +15,18 @@ export async function GET(req: NextRequest) {
   const sort = searchParams.get("sort");
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "50");
+  const all = searchParams.get("all") === "true";
+  const statusFilter = searchParams.get("status");
 
-  const where: Record<string, unknown> = {
-    status: "ACTIVE",
-  };
+  const where: Record<string, unknown> = {};
+
+  // Khách chỉ thấy ACTIVE; admin có thể ?all=true hoặc ?status=
+  if (all && session && isAdminRole(session.role)) {
+    if (statusFilter === "active") where.status = "ACTIVE";
+    else if (statusFilter === "inactive") where.status = "INACTIVE";
+  } else {
+    where.status = "ACTIVE";
+  }
 
   if (category) {
     where.category = { slug: category };

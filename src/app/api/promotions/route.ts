@@ -30,13 +30,27 @@ export async function POST(req: NextRequest) {
   const image = String(body.image || "").trim();
   const discount = Number(body.discount || 0);
   const endDate = body.endDate ? new Date(body.endDate) : null;
+  const ruleType = ["percent", "bogo", "banner"].includes(body.ruleType)
+    ? String(body.ruleType)
+    : "banner";
+  const categorySlug = body.categorySlug
+    ? String(body.categorySlug).trim() || null
+    : null;
 
   if (!title || !description || !image || !endDate || Number.isNaN(endDate.getTime())) {
     return apiError("Thiếu thông tin khuyến mãi");
   }
 
   const promotion = await prisma.promotion.create({
-    data: { title, description, image, discount, endDate },
+    data: {
+      title,
+      description,
+      image,
+      discount,
+      endDate,
+      ruleType,
+      categorySlug,
+    },
   });
   return apiSuccess(mapPromotion(promotion), 201);
 }

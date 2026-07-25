@@ -169,7 +169,7 @@ export function RegisterForm() {
         <div className="flex items-start gap-2">
           <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-emerald-700">
-            Đăng ký miễn phí — Nhận ngay voucher <strong>ANPHU10</strong> giảm 10% cho đơn đầu tiên!
+            Đăng ký miễn phí — Dùng mã <strong>TAPHOA10</strong> giảm 10% cho đơn từ 100.000đ!
           </p>
         </div>
       </div>

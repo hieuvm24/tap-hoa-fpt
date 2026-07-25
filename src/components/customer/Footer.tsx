@@ -131,7 +131,7 @@ export function Footer() {
             title="Google Maps cửa hàng"
             src={
               storeInfo.mapEmbedUrl ||
-              `https://maps.google.com/maps?q=${storeInfo.latitude ?? 10.9804},${storeInfo.longitude ?? 106.5031}&z=15&output=embed&hl=vi`
+              `https://maps.google.com/maps?q=${storeInfo.latitude ?? 20.333},${storeInfo.longitude ?? 105.92}&z=15&output=embed&hl=vi`
             }
             className="h-48 w-full border-0"
             loading="lazy"

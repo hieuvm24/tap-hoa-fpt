@@ -95,7 +95,7 @@ function buildSystemPrompt(ctx: AiChatContext): string {
       .join(", ") || "thuc pham, do uong, gia vi, banh keo, do gia dung...";
   const promos =
     ctx.promotions?.map((p) => `- ${p.title} (giam ${p.discount}%)`).join("\n") ||
-    "- Ma ANPHU10 giam 10%";
+    "- Ma TAPHOA10 giam 10% (don tu 100.000d)";
 
   return `Ban la nhan vien tu van cua "${ctx.store.name}" — tiem tap hoa / sieu thi mini o que (Gia Vien, Ninh Binh).
 Noi tieng Viet tu nhien, ngan gon, lich su. Co the dung **in dam**.
@@ -365,7 +365,7 @@ function ruleBasedReply(message: string, ctx: AiChatContext): AiChatResult {
         ? promotions.map((p) => `• ${p.title} (−${p.discount}%)`).join("\n")
         : "• Đang cập nhật chương trình mới";
     return {
-      text: `Ưu đãi hiện có:\n${promoLines}\n\nMã nhanh: **ANPHU10** giảm 10% (nhập ở giỏ / thanh toán). Áp dụng cả đơn online.`,
+      text: `Ưu đãi hiện có:\n${promoLines}\n\nMã nhanh: **TAPHOA10** giảm 10% cho đơn từ 100.000đ (nhập ở giỏ / thanh toán). Có thể giao hoặc đến lấy tại quầy.`,
       source: "rules",
     };
   }

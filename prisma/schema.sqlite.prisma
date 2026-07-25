@@ -106,6 +106,8 @@ model Order {
   paymentMethod String
   paymentStatus String          @default("pending")
   paymentTxnRef String?
+  /// delivery = giao tận nơi | pickup = đến lấy tại quầy
+  fulfillmentType String        @default("delivery")
   address       String
   note          String?
   voucherCode   String?
@@ -149,12 +151,16 @@ model Review {
 }
 
 model Promotion {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  image       String
-  discount    Int      @default(0)
-  endDate     DateTime
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  image        String
+  discount     Int      @default(0)
+  endDate      DateTime
+  /// percent | bogo | banner (banner = chỉ trưng bày)
+  ruleType     String   @default("banner")
+  /// Áp dụng theo slug danh mục (rau-cu, sua, ...)
+  categorySlug String?
 }
 
 model Voucher {

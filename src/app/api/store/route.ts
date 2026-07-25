@@ -64,8 +64,8 @@ export async function PUT(req: NextRequest) {
       longitude: (data.longitude as number) ?? null,
       mapEmbedUrl: (data.mapEmbedUrl as string) || null,
       bankName: String(data.bankName || "Vietcombank"),
-      bankAccount: String(data.bankAccount || "0123456789"),
-      bankOwner: String(data.bankOwner || "TAP HOA FPT"),
+      bankAccount: String(data.bankAccount || "0388025515"),
+      bankOwner: String(data.bankOwner || "VU MINH HIEU"),
     },
   });
 

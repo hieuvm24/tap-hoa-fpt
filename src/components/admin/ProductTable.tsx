@@ -21,7 +21,7 @@ export function ProductTable() {
 
   const loadProducts = () => {
     setLoading(true);
-    api.products.list({ limit: "100" }).then((res) => {
+    api.products.list({ limit: "500", all: "true" }).then((res) => {
       if (res.success && res.data) {
         const list = Array.isArray(res.data) ? res.data : res.data.products;
         setProducts(list);

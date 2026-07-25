@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/utils";
 import { Button, Card, Input } from "@/components/ui";
 import { useCart } from "@/context/CartContext";
 import { api } from "@/lib/api";
+import { FREE_SHIP_THRESHOLD, SHIPPING_FEE } from "@/config/defaults";
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem, subtotal } = useCart();
@@ -17,7 +18,7 @@ export default function CartPage() {
   const [discount, setDiscount] = useState(0);
   const [voucherError, setVoucherError] = useState("");
 
-  const shippingFee = subtotal >= 200000 ? 0 : 15000;
+  const shippingFee = subtotal >= FREE_SHIP_THRESHOLD ? 0 : SHIPPING_FEE;
   const total = subtotal + shippingFee - discount;
 
   const applyVoucher = async () => {

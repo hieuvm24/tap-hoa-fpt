@@ -68,6 +68,8 @@ export function mapReview(r: DbReview): Review {
 }
 
 export function mapPromotion(p: DbPromotion): Promotion {
+  const rule =
+    p.ruleType === "percent" || p.ruleType === "bogo" ? p.ruleType : "banner";
   return {
     id: p.id,
     title: p.title,
@@ -75,6 +77,8 @@ export function mapPromotion(p: DbPromotion): Promotion {
     image: p.image,
     discount: p.discount,
     endDate: p.endDate.toISOString().split("T")[0],
+    ruleType: rule,
+    categorySlug: p.categorySlug ?? null,
   };
 }
 
@@ -117,6 +121,8 @@ export function mapOrder(o: OrderWithRelations): Order {
     paymentMethod: o.paymentMethod as "cod" | "transfer" | "vnpay",
     paymentStatus: o.paymentStatus as "pending" | "paid" | "failed",
     paymentTxnRef: o.paymentTxnRef || undefined,
+    fulfillmentType:
+      o.fulfillmentType === "pickup" ? "pickup" : "delivery",
     address: o.address,
     note: o.note || undefined,
     createdAt: o.createdAt.toISOString(),

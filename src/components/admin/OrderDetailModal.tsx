@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Check, Truck, Package, X } from "lucide-react";
+import { Check, Truck, Package, X, Store } from "lucide-react";
 import { Order, OrderStatus } from "@/types";
 import { formatPrice, formatDate } from "@/lib/utils";
-import { Modal, Button } from "@/components/ui";
+import { Modal, Button, Badge } from "@/components/ui";
 
 interface OrderDetailModalProps {
   order: Order;
@@ -22,11 +22,27 @@ const statusLabels: Record<OrderStatus, string> = {
   cancelled: "Đã hủy",
 };
 
-const nextStatus: Partial<Record<OrderStatus, OrderStatus>> = {
-  pending: "confirmed",
-  confirmed: "shipping",
-  shipping: "delivered",
+const paymentMethodLabels = {
+  cod: "Khi nhận hàng",
+  transfer: "Chuyển khoản",
+  vnpay: "VNPay",
 };
+
+const paymentStatusLabels = {
+  pending: "Chưa thanh toán",
+  paid: "Đã thanh toán",
+  failed: "Thất bại",
+};
+
+function nextStatusFor(order: Order): OrderStatus | null {
+  if (order.status === "pending") return "confirmed";
+  if (order.status === "confirmed") {
+    // Đến lấy: bỏ bước "đang giao"
+    return order.fulfillmentType === "pickup" ? "delivered" : "shipping";
+  }
+  if (order.status === "shipping") return "delivered";
+  return null;
+}
 
 function ProductThumb({ src, alt }: { src?: string; alt: string }) {
   const [broken, setBroken] = useState(!src);
@@ -56,23 +72,30 @@ export function OrderDetailModal({
   onStatusUpdate,
 }: OrderDetailModalProps) {
   const canAct = order.status !== "delivered" && order.status !== "cancelled";
+  const next = nextStatusFor(order);
+  const isPickup = order.fulfillmentType === "pickup";
 
   const footer = canAct ? (
     <div className="flex flex-wrap gap-2">
-      {nextStatus[order.status] && (
+      {next && (
         <Button
           size="sm"
           className="gap-1"
-          onClick={() => onStatusUpdate(order.id, nextStatus[order.status]!)}
+          onClick={() => onStatusUpdate(order.id, next)}
         >
           {order.status === "pending" && (
             <>
               <Check className="h-4 w-4" /> Xác nhận
             </>
           )}
-          {order.status === "confirmed" && (
+          {order.status === "confirmed" && !isPickup && (
             <>
               <Truck className="h-4 w-4" /> Đang giao
+            </>
+          )}
+          {order.status === "confirmed" && isPickup && (
+            <>
+              <Store className="h-4 w-4" /> Đã lấy tại quầy
             </>
           )}
           {order.status === "shipping" && (
@@ -103,6 +126,18 @@ export function OrderDetailModal({
       footer={footer}
     >
       <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant={isPickup ? "info" : "default"}>
+            {isPickup ? "Đến lấy tại quầy" : "Giao tận nơi"}
+          </Badge>
+          <Badge variant={order.paymentStatus === "paid" ? "success" : "warning"}>
+            {paymentStatusLabels[order.paymentStatus]}
+          </Badge>
+          <Badge variant="default">
+            {paymentMethodLabels[order.paymentMethod]}
+          </Badge>
+        </div>
+
         <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           <div className="rounded-lg bg-gray-50 p-3">
             <p className="mb-1 text-xs text-gray-500">Khách hàng</p>
@@ -110,7 +145,9 @@ export function OrderDetailModal({
             <p className="text-gray-600">{order.customerPhone}</p>
           </div>
           <div className="rounded-lg bg-gray-50 p-3">
-            <p className="mb-1 text-xs text-gray-500">Địa chỉ giao / nhận</p>
+            <p className="mb-1 text-xs text-gray-500">
+              {isPickup ? "Nhận hàng" : "Địa chỉ giao"}
+            </p>
             <p className="font-medium text-gray-900">{order.address}</p>
           </div>
         </div>
@@ -143,11 +180,27 @@ export function OrderDetailModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
-          <span className="font-semibold text-gray-900">Tổng cộng</span>
-          <span className="text-base font-bold text-primary-600">
-            {formatPrice(order.total)}
-          </span>
+        <div className="space-y-1 border-t border-gray-100 pt-3 text-sm">
+          <div className="flex justify-between text-gray-600">
+            <span>Phí ship</span>
+            <span>
+              {order.shippingFee === 0
+                ? "Miễn phí"
+                : formatPrice(order.shippingFee)}
+            </span>
+          </div>
+          {order.discount > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span>Giảm giá</span>
+              <span>-{formatPrice(order.discount)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between pt-1">
+            <span className="font-semibold text-gray-900">Tổng cộng</span>
+            <span className="text-base font-bold text-primary-600">
+              {formatPrice(order.total)}
+            </span>
+          </div>
         </div>
 
         <div>
@@ -161,6 +214,11 @@ export function OrderDetailModal({
                 <div className="min-w-0 flex-1 sm:flex sm:items-baseline sm:justify-between sm:gap-3">
                   <p className="text-sm font-medium text-gray-800">
                     {statusLabels[step.status]}
+                    {step.note ? (
+                      <span className="ml-1 font-normal text-gray-500">
+                        — {step.note}
+                      </span>
+                    ) : null}
                   </p>
                   <p className="text-xs text-gray-400">{formatDate(step.date)}</p>
                 </div>

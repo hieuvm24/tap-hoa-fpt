@@ -19,6 +19,16 @@ export async function PUT(
   if (body.image !== undefined) data.image = String(body.image).trim();
   if (body.discount !== undefined) data.discount = Number(body.discount);
   if (body.endDate !== undefined) data.endDate = new Date(body.endDate);
+  if (body.ruleType !== undefined) {
+    data.ruleType = ["percent", "bogo", "banner"].includes(body.ruleType)
+      ? String(body.ruleType)
+      : "banner";
+  }
+  if (body.categorySlug !== undefined) {
+    data.categorySlug = body.categorySlug
+      ? String(body.categorySlug).trim() || null
+      : null;
+  }
 
   try {
     const promotion = await prisma.promotion.update({ where: { id }, data });

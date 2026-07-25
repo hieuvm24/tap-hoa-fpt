@@ -20,6 +20,7 @@ export interface CartItem {
   image: string;
   stock: number;
   quantity: number;
+  categorySlug?: string;
 }
 
 interface CartContextValue {
@@ -57,6 +58,7 @@ export function productToCartItem(product: Product, quantity = 1): CartItem {
     image: product.image,
     stock: product.stock,
     quantity,
+    categorySlug: product.categorySlug,
   };
 }
 

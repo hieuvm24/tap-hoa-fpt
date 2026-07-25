@@ -35,6 +35,29 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { id: session.userId } });
   if (!user) return apiError("Người dùng không tồn tại", 404);
 
+  // Chỉ đánh giá khi đã mua và đơn đã hoàn thành
+  const purchased = await prisma.orderItem.findFirst({
+    where: {
+      productId,
+      order: {
+        userId: session.userId,
+        status: "delivered",
+      },
+    },
+  });
+  if (!purchased) {
+    return apiError(
+      "Bạn chỉ có thể đánh giá sản phẩm đã mua và nhận hàng thành công"
+    );
+  }
+
+  const existing = await prisma.review.findFirst({
+    where: { productId, userId: user.id },
+  });
+  if (existing) {
+    return apiError("Bạn đã đánh giá sản phẩm này rồi");
+  }
+
   const review = await prisma.$transaction(async (tx) => {
     const created = await tx.review.create({
       data: {

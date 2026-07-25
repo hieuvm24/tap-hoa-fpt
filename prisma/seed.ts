@@ -180,7 +180,7 @@ async function main() {
       latitude: 20.333,
       longitude: 105.92,
       bankName: "Vietcombank",
-      bankAccount: "0123456789",
+      bankAccount: "0388025515",
       bankOwner: "TAP HOA FPT",
     },
   });
@@ -234,7 +234,7 @@ async function main() {
   });
 
   await prisma.voucher.create({
-    data: { code: "ANPHU10", discount: 10, minOrder: 0, isActive: true },
+    data: { code: "TAPHOA10", discount: 10, minOrder: 100000, isActive: true },
   });
 
   const categoriesData = [
@@ -388,9 +388,33 @@ async function main() {
 
   await prisma.promotion.createMany({
     data: [
-      { title: "Giảm 20% rau củ tươi", description: "Áp dụng cho rau củ", image: productImages.rau, discount: 20, endDate: new Date("2026-12-31") },
-      { title: "Mua 2 tặng 1 sữa Vinamilk", description: "Ưu đãi sữa", image: productImages.sua, discount: 33, endDate: new Date("2026-12-31") },
-      { title: "Freeship đơn từ 200K", description: "Miễn phí giao hàng", image: productImages.banhKeo, discount: 0, endDate: new Date("2026-12-31") },
+      {
+        title: "Giảm 20% rau củ tươi",
+        description: "Tự động giảm 20% các SP danh mục Rau củ khi thanh toán",
+        image: productImages.rau,
+        discount: 20,
+        endDate: new Date("2026-12-31"),
+        ruleType: "percent",
+        categorySlug: "rau-cu",
+      },
+      {
+        title: "Mua 2 tặng 1 sữa",
+        description: "Mua 3 sản phẩm sữa bất kỳ — tặng 1 (giá thấp nhất)",
+        image: productImages.sua,
+        discount: 0,
+        endDate: new Date("2026-12-31"),
+        ruleType: "bogo",
+        categorySlug: "sua",
+      },
+      {
+        title: "Freeship đơn từ 200K",
+        description: "Miễn phí giao hàng nội thị khi đơn đủ điều kiện",
+        image: productImages.banhKeo,
+        discount: 0,
+        endDate: new Date("2026-12-31"),
+        ruleType: "banner",
+        categorySlug: null,
+      },
     ],
   });
 
@@ -441,7 +465,7 @@ async function main() {
       paymentMethod: "cod",
       paymentStatus: "pending",
       address: sampleAddresses[1],
-      voucherCode: "ANPHU10",
+      voucherCode: "TAPHOA10",
       items: {
         create: [
           { productId: productIds["sua-tuoi-vinamilk-1l"], quantity: 2, price: 32000, productName: "Sữa tươi Vinamilk 1L", productImage: productImages.sua },

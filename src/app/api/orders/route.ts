@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession, isAdminRole } from "@/lib/auth-server";
 import { mapOrder, apiSuccess, apiError } from "@/lib/mappers";
+import { FREE_SHIP_THRESHOLD, SHIPPING_FEE, DEFAULT_STORE } from "@/config/defaults";
+import { calcPromotionDiscount } from "@/lib/promotions";
 
 const orderInclude = {
   items: { include: { product: true } },
@@ -14,6 +16,21 @@ export async function GET(req: NextRequest) {
   const mine = searchParams.get("mine");
   const status = searchParams.get("status");
   const limitRaw = Number(searchParams.get("limit") || 0);
+  const code = searchParams.get("code")?.trim().toUpperCase();
+  const phone = searchParams.get("phone")?.replace(/\D/g, "");
+
+  // Tra cứu đơn khách (không cần đăng nhập): mã đơn + SĐT
+  if (code && phone) {
+    const order = await prisma.order.findFirst({
+      where: {
+        orderCode: code,
+        customerPhone: { contains: phone.slice(-9) },
+      },
+      include: orderInclude,
+    });
+    if (!order) return apiError("Không tìm thấy đơn hàng với mã và SĐT này", 404);
+    return apiSuccess([mapOrder(order)]);
+  }
 
   const where: Record<string, unknown> = {};
 
@@ -50,83 +67,188 @@ export async function POST(req: NextRequest) {
     paymentMethod,
     items,
     voucherCode,
+    fulfillmentType: rawFulfillment,
+    walkIn,
   } = body;
 
-  if (!customerName || !customerPhone || !address || !items?.length) {
+  const isWalkIn = Boolean(walkIn);
+  if (isWalkIn && (!session || !isAdminRole(session.role))) {
+    return apiError("Chỉ nhân viên / chủ cửa hàng được bán tại quầy", 403);
+  }
+
+  const fulfillmentType =
+    isWalkIn || rawFulfillment === "pickup" ? "pickup" : "delivery";
+
+  if (!customerName || !customerPhone || !items?.length) {
     return apiError("Thiếu thông tin đơn hàng");
+  }
+  if (fulfillmentType === "delivery" && !address) {
+    return apiError("Vui lòng nhập địa chỉ giao hàng");
   }
 
   const productIds = items.map((i: { productId: string }) => i.productId);
   const products = await prisma.product.findMany({
-    where: { id: { in: productIds } },
+    where: { id: { in: productIds }, status: "ACTIVE" },
+    include: { category: true },
   });
   const productMap = Object.fromEntries(products.map((p) => [p.id, p]));
 
   let subtotal = 0;
-  const orderItems = items.map((item: { productId: string; quantity: number }) => {
+  const orderItems: {
+    productId: string;
+    quantity: number;
+    price: number;
+    productName: string;
+    productImage: string;
+  }[] = [];
+  const promoLines: { categorySlug: string; price: number; quantity: number }[] =
+    [];
+
+  for (const item of items as { productId: string; quantity: number }[]) {
     const product = productMap[item.productId];
-    if (!product) throw new Error("Sản phẩm không tồn tại");
+    if (!product) {
+      return apiError("Sản phẩm không tồn tại hoặc đã ngừng bán");
+    }
+    if (item.quantity < 1) {
+      return apiError("Số lượng không hợp lệ");
+    }
     if (product.stock < item.quantity) {
-      throw new Error(`${product.name} không đủ hàng (còn ${product.stock})`);
+      return apiError(`${product.name} không đủ hàng (còn ${product.stock})`);
     }
     subtotal += product.price * item.quantity;
-    return {
+    orderItems.push({
       productId: product.id,
       quantity: item.quantity,
       price: product.price,
       productName: product.name,
       productImage: product.image,
-    };
-  });
+    });
+    promoLines.push({
+      categorySlug: product.category.slug,
+      price: product.price,
+      quantity: item.quantity,
+    });
+  }
 
-  let discount = 0;
+  const activePromos = await prisma.promotion.findMany({
+    where: { endDate: { gte: new Date() } },
+  });
+  const { amount: promoDiscount, labels: promoLabels } = calcPromotionDiscount(
+    activePromos,
+    promoLines
+  );
+
+  let voucherDiscount = 0;
+  let appliedVoucher: string | undefined;
   if (voucherCode) {
     const voucher = await prisma.voucher.findFirst({
       where: { code: voucherCode.toUpperCase(), isActive: true },
     });
-    if (voucher && subtotal >= voucher.minOrder) {
-      discount = Math.round(subtotal * (voucher.discount / 100));
+    if (!voucher) {
+      return apiError("Mã giảm giá không hợp lệ hoặc đã hết hạn");
     }
+    if (subtotal < voucher.minOrder) {
+      return apiError(
+        `Đơn tối thiểu ${voucher.minOrder.toLocaleString("vi-VN")}đ để dùng mã này`
+      );
+    }
+    voucherDiscount = Math.round(subtotal * (voucher.discount / 100));
+    appliedVoucher = voucher.code;
   }
 
-  const shippingFee = subtotal >= 200000 ? 0 : 15000;
-  const total = subtotal + shippingFee - discount;
+  const discount = Math.min(subtotal, promoDiscount + voucherDiscount);
 
-  const count = await prisma.order.count();
-  const orderCode = `DH${String(count + 1).padStart(6, "0")}`;
+  const shippingFee =
+    fulfillmentType === "pickup"
+      ? 0
+      : subtotal >= FREE_SHIP_THRESHOLD
+        ? 0
+        : SHIPPING_FEE;
+  const total = Math.max(0, subtotal + shippingFee - discount);
 
-  const order = await prisma.$transaction(async (tx) => {
-    for (const item of orderItems) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
-      });
-    }
+  const store = await prisma.storeSetting.findUnique({ where: { id: "default" } });
+  const storeAddress = store?.address || DEFAULT_STORE.address;
 
-    return tx.order.create({
-      data: {
-        orderCode,
-        userId: session?.userId,
-        customerName,
-        customerPhone,
-        customerEmail,
-        subtotal,
-        shippingFee,
-        discount,
-        total,
-        paymentMethod: paymentMethod as string,
-        paymentStatus: "pending",
-        address,
-        note,
-        voucherCode: voucherCode?.toUpperCase(),
-        items: { create: orderItems },
-        timeline: {
-          create: [{ status: "pending", note: "Đơn hàng đã được đặt" }],
+  const shipAddress =
+    fulfillmentType === "pickup"
+      ? `Nhận tại quầy — ${storeAddress}`
+      : String(address);
+
+  const noteParts = [
+    note,
+    promoLabels.length ? `KM: ${promoLabels.join("; ")}` : null,
+  ].filter(Boolean);
+
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      for (const item of orderItems) {
+        const updated = await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            stock: { gte: item.quantity },
+          },
+          data: {
+            stock: { decrement: item.quantity },
+            soldCount: { increment: item.quantity },
+          },
+        });
+        if (updated.count === 0) {
+          throw new Error(
+            `Hết hàng hoặc không đủ tồn: ${item.productName}`
+          );
+        }
+      }
+
+      const orderCode = `${isWalkIn ? "TQ" : "DH"}${Date.now()
+        .toString(36)
+        .toUpperCase()}${Math.floor(Math.random() * 100)
+        .toString()
+        .padStart(2, "0")}`;
+
+      const timelineCreates = isWalkIn
+        ? [
+            { status: "pending", note: "Bán tại quầy" },
+            { status: "confirmed", note: "Thu ngân xác nhận" },
+            { status: "delivered", note: "Khách đã nhận tại quầy" },
+          ]
+        : [
+            {
+              status: "pending",
+              note:
+                fulfillmentType === "pickup"
+                  ? "Đơn đến lấy tại quầy — chờ xác nhận"
+                  : "Đơn hàng đã được đặt",
+            },
+          ];
+
+      return tx.order.create({
+        data: {
+          orderCode,
+          userId: isWalkIn ? undefined : session?.userId,
+          customerName,
+          customerPhone,
+          customerEmail,
+          subtotal,
+          shippingFee,
+          discount,
+          total,
+          status: isWalkIn ? "delivered" : "pending",
+          paymentMethod: (paymentMethod as string) || "cod",
+          paymentStatus: isWalkIn ? "paid" : "pending",
+          fulfillmentType,
+          address: shipAddress,
+          note: noteParts.join(" | ") || undefined,
+          voucherCode: appliedVoucher,
+          items: { create: orderItems },
+          timeline: { create: timelineCreates },
         },
-      },
-      include: orderInclude,
+        include: orderInclude,
+      });
     });
-  });
 
-  return apiSuccess(mapOrder(order), 201);
+    return apiSuccess(mapOrder(order), 201);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Không tạo được đơn hàng";
+    return apiError(msg);
+  }
 }
