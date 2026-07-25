@@ -17,6 +17,8 @@
     "check": "tsx scripts/final-check.ts",
     "db:enrich": "tsx scripts/enrich-catalog.ts",
     "db:fix-images": "tsx scripts/fix-product-images.ts",
+    "db:expand-300": "tsx scripts/expand-300.ts",
+    "db:rematch-images": "tsx scripts/rematch-off-images.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
