@@ -58,21 +58,32 @@ export async function POST(req: NextRequest) {
     return apiError("Bạn đã đánh giá sản phẩm này rồi");
   }
 
-  const review = await prisma.$transaction(async (tx) => {
-    const created = await tx.review.create({
-      data: {
-        productId,
-        userId: user.id,
-        customerName: user.name,
-        avatar: user.avatar,
-        rating,
-        comment,
-      },
+  try {
+    const review = await prisma.$transaction(async (tx) => {
+      const created = await tx.review.create({
+        data: {
+          productId,
+          userId: user.id,
+          customerName: user.name,
+          avatar: user.avatar,
+          rating,
+          comment,
+        },
+      });
+
+      await syncProductRating(tx, productId);
+      return created;
     });
 
-    await syncProductRating(tx, productId);
-    return created;
-  });
-
-  return apiSuccess(mapReview(review), 201);
+    return apiSuccess(mapReview(review), 201);
+  } catch (e: unknown) {
+    const code =
+      e && typeof e === "object" && "code" in e
+        ? String((e as { code: string }).code)
+        : "";
+    if (code === "P2002") {
+      return apiError("Bạn đã đánh giá sản phẩm này rồi");
+    }
+    throw e;
+  }
 }

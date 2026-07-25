@@ -6,11 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Product } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 
-const CART_KEY = "taphoa_cart";
+const LEGACY_CART_KEY = "taphoa_cart";
+const GUEST_CART_KEY = "taphoa_cart_guest";
 
 export interface CartItem {
   productId: string;
@@ -35,18 +38,40 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-function loadCart(): CartItem[] {
-  if (typeof window === "undefined") return [];
+function cartStorageKey(userId: string | null | undefined) {
+  return userId ? `taphoa_cart_u_${userId}` : GUEST_CART_KEY;
+}
+
+function parseCart(raw: string | null): CartItem[] {
+  if (!raw) return [];
   try {
-    const stored = localStorage.getItem(CART_KEY);
-    return stored ? (JSON.parse(stored) as CartItem[]) : [];
+    const data = JSON.parse(raw) as CartItem[];
+    return Array.isArray(data) ? data : [];
   } catch {
     return [];
   }
 }
 
-function saveCart(items: CartItem[]) {
-  localStorage.setItem(CART_KEY, JSON.stringify(items));
+function loadCart(key: string): CartItem[] {
+  if (typeof window === "undefined") return [];
+  const stored = localStorage.getItem(key);
+  if (stored) return parseCart(stored);
+
+  // Giỏ cũ dùng chung → chỉ chuyển sang giỏ khách 1 lần, không gắn vào mọi tài khoản
+  if (key === GUEST_CART_KEY) {
+    const legacy = localStorage.getItem(LEGACY_CART_KEY);
+    if (legacy) {
+      localStorage.setItem(GUEST_CART_KEY, legacy);
+      localStorage.removeItem(LEGACY_CART_KEY);
+      return parseCart(legacy);
+    }
+  }
+  return [];
+}
+
+function saveCart(key: string, items: CartItem[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(key, JSON.stringify(items));
 }
 
 export function productToCartItem(product: Product, quantity = 1): CartItem {
@@ -63,17 +88,54 @@ export function productToCartItem(product: Product, quantity = 1): CartItem {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const storageKey = useMemo(
+    () => cartStorageKey(user?.id ?? null),
+    [user?.id]
+  );
+
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const skipNextSave = useRef(false);
 
+  // Đổi tài khoản / hết loading → nạp đúng giỏ của user đó
   useEffect(() => {
-    setItems(loadCart());
+    if (isLoading) return;
+    skipNextSave.current = true;
+
+    let next = loadCart(storageKey);
+
+    // Dang nhap: gop gio khach (neu co) vao gio user 1 lan
+    if (user?.id) {
+      const guestItems = loadCart(GUEST_CART_KEY);
+      if (guestItems.length) {
+        const map = new Map(next.map((i) => [i.productId, { ...i }]));
+        for (const g of guestItems) {
+          const cur = map.get(g.productId);
+          if (cur) {
+            cur.quantity = Math.min(cur.stock, cur.quantity + g.quantity);
+          } else {
+            map.set(g.productId, { ...g });
+          }
+        }
+        next = [...map.values()];
+        localStorage.removeItem(GUEST_CART_KEY);
+        saveCart(storageKey, next);
+      }
+    }
+
+    setItems(next);
     setHydrated(true);
-  }, []);
+  }, [storageKey, isLoading, user?.id]);
 
   useEffect(() => {
-    if (hydrated) saveCart(items);
-  }, [items, hydrated]);
+    if (!hydrated || isLoading) return;
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
+      return;
+    }
+    saveCart(storageKey, items);
+  }, [items, hydrated, storageKey, isLoading]);
 
   const addItem = useCallback((product: Product, quantity = 1) => {
     setItems((prev) => {

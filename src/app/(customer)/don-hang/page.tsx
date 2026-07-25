@@ -292,7 +292,8 @@ function OrdersContent() {
                 </p>
                 {isAuthenticated &&
                   (selectedOrder.status === "pending" ||
-                    selectedOrder.status === "confirmed") && (
+                    selectedOrder.status === "confirmed") &&
+                  selectedOrder.paymentStatus !== "paid" && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -312,6 +313,14 @@ function OrdersContent() {
                     >
                       Hủy đơn hàng
                     </Button>
+                  )}
+                {isAuthenticated &&
+                  selectedOrder.paymentStatus === "paid" &&
+                  selectedOrder.status !== "cancelled" &&
+                  selectedOrder.status !== "delivered" && (
+                    <p className="mt-3 text-xs text-amber-700">
+                      Đơn đã thanh toán — liên hệ cửa hàng nếu cần hủy / hoàn tiền.
+                    </p>
                   )}
               </div>
             </Card>

@@ -11,6 +11,14 @@ export function isVnpayConfigured(): boolean {
   return Boolean(VNP_TMN_CODE && VNP_HASH_SECRET);
 }
 
+/** Demo unsigned payment only when explicitly enabled AND not production */
+export function isVnpayDemoAllowed(): boolean {
+  if (process.env.NODE_ENV === "production" && process.env.VNPAY_DEMO !== "true") {
+    return false;
+  }
+  return process.env.VNPAY_DEMO === "true" || process.env.NODE_ENV !== "production";
+}
+
 function sortObject(obj: Record<string, string>): Record<string, string> {
   return Object.keys(obj)
     .sort()
@@ -39,7 +47,18 @@ export function createVnpayPaymentUrl(input: {
     .slice(0, 14);
 
   if (!isVnpayConfigured()) {
-    const demoUrl = `${APP_URL}/api/payments/vnpay/return?demo=1&vnp_TxnRef=${encodeURIComponent(txnRef)}&vnp_Amount=${input.amount * 100}&vnp_ResponseCode=00&vnp_OrderInfo=${encodeURIComponent(input.orderInfo)}&orderCode=${encodeURIComponent(input.orderCode)}`;
+    if (!isVnpayDemoAllowed()) {
+      throw new Error(
+        "VNPay chua cau hinh. Dat VNPAY_TMN_CODE + VNPAY_HASH_SECRET, hoac VNPAY_DEMO=true cho moi truong test."
+      );
+    }
+    const demoUrl =
+      `${APP_URL}/api/payments/vnpay/return?demo=1` +
+      `&vnp_TxnRef=${encodeURIComponent(txnRef)}` +
+      `&vnp_Amount=${input.amount * 100}` +
+      `&vnp_ResponseCode=00` +
+      `&vnp_OrderInfo=${encodeURIComponent(input.orderInfo)}` +
+      `&orderCode=${encodeURIComponent(input.orderCode)}`;
     return { paymentUrl: demoUrl, txnRef, demo: true };
   }
 
@@ -84,6 +103,14 @@ export function verifyVnpayReturn(
   delete params.vnp_SecureHashType;
 
   if (!isVnpayConfigured()) {
+    if (!isVnpayDemoAllowed()) {
+      return {
+        valid: false,
+        success: false,
+        txnRef: query.vnp_TxnRef || "",
+        responseCode: "99",
+      };
+    }
     return {
       valid: true,
       success: query.vnp_ResponseCode === "00" || query.demo === "1",

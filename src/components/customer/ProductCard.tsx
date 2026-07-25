@@ -7,8 +7,7 @@ import { Product } from "@/types";
 import { formatPrice, calculateDiscount, cn } from "@/lib/utils";
 import { Card, Button, StarRating, Badge } from "@/components/ui";
 import { useCart } from "@/context/CartContext";
-import { api } from "@/lib/api";
-import { useState } from "react";
+import { useWishlist } from "@/context/WishlistContext";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 
 interface ProductCardProps {
@@ -18,8 +17,9 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const discount = calculateDiscount(product.price, product.originalPrice);
   const { addItem } = useCart();
+  const { isLiked, toggle } = useWishlist();
   const requireLogin = useRequireLogin();
-  const [liked, setLiked] = useState(false);
+  const liked = isLiked(product.id);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -32,12 +32,7 @@ export function ProductCard({ product }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
     if (!requireLogin(`/san-pham/${product.slug}`)) return;
-    const next = !liked;
-    setLiked(next);
-    const res = next
-      ? await api.wishlist.add(product.id)
-      : await api.wishlist.remove(product.id);
-    if (!res.success) setLiked(!next);
+    await toggle(product.id);
   };
 
   return (

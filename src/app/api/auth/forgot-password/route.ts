@@ -3,8 +3,27 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth-server";
 import { apiSuccess, apiError } from "@/lib/mappers";
+import { rateLimit } from "@/lib/rate-limit";
+
+const GENERIC_MSG =
+  "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được xử lý.";
+
+function allowResetUrlInResponse(): boolean {
+  // Chi demo local / khi bat DEMO_AUTH — khong bao gio lo token tren production
+  if (process.env.DEMO_AUTH === "true") return true;
+  return process.env.NODE_ENV !== "production";
+}
 
 export async function POST(req: NextRequest) {
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+  const rl = rateLimit(`forgot:${ip}`, 5, 15 * 60 * 1000);
+  if (!rl.ok) {
+    return apiError("Quá nhiều yêu cầu. Thử lại sau ít phút.", 429);
+  }
+
   const body = await req.json();
   const email = String(body.email || "")
     .trim()
@@ -13,12 +32,8 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({ where: { email } });
 
-  // Always return success to avoid email enumeration
   if (!user) {
-    return apiSuccess({
-      sent: true,
-      message: "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được tạo.",
-    });
+    return apiSuccess({ sent: true, message: GENERIC_MSG });
   }
 
   const token = crypto.randomBytes(32).toString("hex");
@@ -31,13 +46,19 @@ export async function POST(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const resetUrl = `${appUrl}/dat-lai-mat-khau?token=${token}`;
 
-  // Dev/demo: return resetUrl so UI can show it (no SMTP configured)
-  return apiSuccess({
-    sent: true,
-    message: "Đã tạo link đặt lại mật khẩu (demo — không gửi email thật).",
-    resetUrl,
-    demo: true,
-  });
+  // TODO: gui email SMTP that trong moi truong production
+  if (allowResetUrlInResponse()) {
+    return apiSuccess({
+      sent: true,
+      message: "Đã tạo link đặt lại mật khẩu (chế độ demo local).",
+      resetUrl,
+      demo: true,
+    });
+  }
+
+  // Khong log token / URL — tranh lo qua he thong log
+  console.info("[forgot-password] reset requested for user", user.id);
+  return apiSuccess({ sent: true, message: GENERIC_MSG });
 }
 
 export async function PUT(req: NextRequest) {

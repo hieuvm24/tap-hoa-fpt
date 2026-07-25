@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
 const COOKIE_NAME = "taphoa_token";
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "taphoa-fpt-dev-secret"
-);
+const JWT_SECRET_RAW =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === "production" ? "" : "taphoa-fpt-dev-secret");
+const JWT_SECRET = JWT_SECRET_RAW
+  ? new TextEncoder().encode(JWT_SECRET_RAW)
+  : null;
 
 /** Chỉ chủ cửa hàng */
 const OWNER_ONLY_PREFIXES = [
@@ -26,6 +29,7 @@ const AUTH_REQUIRED_PREFIXES = [
 ];
 
 async function getPayload(req: NextRequest) {
+  if (!JWT_SECRET) return null; // production thieu JWT_SECRET → fail-closed
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
   try {
@@ -73,6 +77,22 @@ export async function middleware(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.pathname = "/dang-nhap";
     url.searchParams.set("redirect", pathname + (req.nextUrl.search || ""));
+    return NextResponse.redirect(url);
+  }
+
+  // Nhan vien / chu: mua hang khach dung Ban tai quay, khong dung gio hang storefront
+  const customerShopPaths = ["/gio-hang", "/thanh-toan", "/yeu-thich"];
+  const isCustomerShop = customerShopPaths.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
+  if (
+    isCustomerShop &&
+    session &&
+    (session.role === "STAFF" || session.role === "OWNER")
+  ) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/admin/ban-tai-quay";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

@@ -59,6 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     api.auth.logout();
     setUser(null);
+    // Xoa du lieu UX nhay cam tren may dung chung
+    try {
+      localStorage.removeItem("taphoa_search_history");
+      localStorage.removeItem("taphoa_recently_viewed");
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const updateProfile = useCallback(

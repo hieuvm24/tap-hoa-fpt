@@ -2,10 +2,20 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import type { UserRole } from "@/types/auth";
+import { prisma } from "@/lib/db";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "taphoa-fpt-dev-secret"
-);
+function resolveJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET is required in production");
+    }
+    return new TextEncoder().encode("taphoa-fpt-dev-secret");
+  }
+  return new TextEncoder().encode(secret);
+}
+
+const JWT_SECRET = resolveJwtSecret();
 const COOKIE_NAME = "taphoa_token";
 const TOKEN_EXPIRY = "7d";
 
@@ -63,7 +73,21 @@ export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifyToken(token);
+  const payload = await verifyToken(token);
+  if (!payload) return null;
+
+  // Doc role tu DB — JWT cu khong con quyen sau khi doi vai tro / xoa tai khoan
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    select: { id: true, email: true, role: true },
+  });
+  if (!user) return null;
+
+  return {
+    userId: user.id,
+    email: user.email,
+    role: user.role as UserRole,
+  };
 }
 
 export function isAdminRole(role: UserRole): boolean {

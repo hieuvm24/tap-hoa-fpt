@@ -19,15 +19,16 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get("code")?.trim().toUpperCase();
   const phone = searchParams.get("phone")?.replace(/\D/g, "");
 
-  // Tra cứu đơn khách (không cần đăng nhập): mã đơn + SĐT
-  if (code && phone) {
-    const order = await prisma.order.findFirst({
-      where: {
-        orderCode: code,
-        customerPhone: { contains: phone.slice(-9) },
-      },
+  // Tra cứu đơn khách: mã đơn + SĐT khớp chính xác (sau khi bỏ ký tự)
+  if (code && phone && phone.length >= 9) {
+    const candidates = await prisma.order.findMany({
+      where: { orderCode: code },
       include: orderInclude,
+      take: 5,
     });
+    const order = candidates.find(
+      (o) => o.customerPhone.replace(/\D/g, "").endsWith(phone.slice(-9))
+    );
     if (!order) return apiError("Không tìm thấy đơn hàng với mã và SĐT này", 404);
     return apiSuccess([mapOrder(order)]);
   }
@@ -77,6 +78,17 @@ export async function POST(req: NextRequest) {
   }
   if (!isWalkIn && !session) {
     return apiError("Vui lòng đăng nhập để đặt hàng", 401);
+  }
+  // Nhan vien / chu chi ban tai quay — khong dat don khach tren storefront
+  if (
+    !isWalkIn &&
+    session &&
+    (session.role === "STAFF" || session.role === "OWNER")
+  ) {
+    return apiError(
+      "Tài khoản nhân viên/chủ cửa hàng dùng mục Bán tại quầy trong Admin",
+      403
+    );
   }
 
   const fulfillmentType =
@@ -181,6 +193,31 @@ export async function POST(req: NextRequest) {
     note,
     promoLabels.length ? `KM: ${promoLabels.join("; ")}` : null,
   ].filter(Boolean);
+
+  // Chong dat trung khi doi mang / bam 2 lan: cung user, cung tong, trong 90s
+  if (session?.userId && !isWalkIn) {
+    const recent = await prisma.order.findFirst({
+      where: {
+        userId: session.userId,
+        total,
+        status: { not: "cancelled" },
+        createdAt: { gte: new Date(Date.now() - 90_000) },
+      },
+      include: orderInclude,
+      orderBy: { createdAt: "desc" },
+    });
+    if (recent) {
+      const sameItems =
+        recent.items.length === orderItems.length &&
+        orderItems.every((oi) =>
+          recent.items.some(
+            (ri) =>
+              ri.productId === oi.productId && ri.quantity === oi.quantity
+          )
+        );
+      if (sameItems) return apiSuccess(mapOrder(recent), 200);
+    }
+  }
 
   try {
     const order = await prisma.$transaction(async (tx) => {

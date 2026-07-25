@@ -3,10 +3,10 @@ import { prisma } from "@/lib/db";
 import {
   createToken,
   setAuthCookie,
-  hashPassword,
   verifyPassword,
 } from "@/lib/auth-server";
 import { apiSuccess, apiError } from "@/lib/mappers";
+import { rateLimit } from "@/lib/rate-limit";
 import type { UserRole } from "@/types/auth";
 
 function toAuthUser(user: {
@@ -42,8 +42,19 @@ export async function POST(req: NextRequest) {
       return apiError("Email và mật khẩu là bắt buộc");
     }
 
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+    const emailKey = String(email).toLowerCase().trim();
+    const rlIp = rateLimit(`login:ip:${ip}`, 30, 15 * 60 * 1000);
+    const rlEmail = rateLimit(`login:email:${emailKey}`, 10, 15 * 60 * 1000);
+    if (!rlIp.ok || !rlEmail.ok) {
+      return apiError("Đăng nhập quá nhiều lần. Thử lại sau ít phút.", 429);
+    }
+
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: emailKey },
     });
 
     if (!user || !(await verifyPassword(password, user.password))) {
