@@ -137,6 +137,7 @@ function ProductDetailContent({ slug }: { slug: string }) {
             <StarRating rating={product.rating} size="md" />
             <span className="text-sm text-gray-500">
               {product.rating} ({product.reviewCount} đánh giá)
+              {product.soldCount > 0 ? ` · Đã bán ${product.soldCount}` : ""}
             </span>
           </div>
           <div className="flex items-baseline gap-3 mb-6">

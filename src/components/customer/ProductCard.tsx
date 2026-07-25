@@ -78,9 +78,14 @@ export function ProductCard({ product }: ProductCardProps) {
           </h3>
         </Link>
 
-        <div className="flex items-center gap-1 mb-2">
-          <StarRating rating={product.rating} />
-          <span className="text-xs text-gray-400">({product.reviewCount})</span>
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <div className="flex items-center gap-1">
+            <StarRating rating={product.rating} />
+            <span className="text-xs text-gray-400">({product.reviewCount})</span>
+          </div>
+          {product.soldCount > 0 && (
+            <span className="text-xs text-gray-400">Đã bán {product.soldCount}</span>
+          )}
         </div>
 
         <div className="flex items-baseline gap-2 mb-3">

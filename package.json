@@ -15,6 +15,8 @@
     "db:sqlite": "tsx scripts/use-db.ts sqlite && prisma generate",
     "db:postgres": "tsx scripts/use-db.ts postgres && prisma generate",
     "check": "tsx scripts/final-check.ts",
+    "db:enrich": "tsx scripts/enrich-catalog.ts",
+    "db:fix-images": "tsx scripts/fix-product-images.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

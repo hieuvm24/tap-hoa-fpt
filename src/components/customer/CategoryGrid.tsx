@@ -11,6 +11,8 @@ import {
   Snowflake,
   UtensilsCrossed,
   Milk,
+  Home,
+  Sparkles,
   LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui";
@@ -26,6 +28,8 @@ const iconMap: Record<string, LucideIcon> = {
   Snowflake,
   UtensilsCrossed,
   Milk,
+  Home,
+  Sparkles,
 };
 
 export function CategoryGrid() {
@@ -45,7 +49,7 @@ export function CategoryGrid() {
           <p className="text-gray-500">Chọn danh mục bạn cần mua sắm</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-5">
           {categories.map((category) => {
             const Icon = iconMap[category.icon] || Salad;
             return (

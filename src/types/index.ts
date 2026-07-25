@@ -14,6 +14,7 @@ export interface Product {
   stock: number;
   rating: number;
   reviewCount: number;
+  soldCount: number;
   status: "active" | "inactive";
   specs: Record<string, string>;
   isFeatured?: boolean;
