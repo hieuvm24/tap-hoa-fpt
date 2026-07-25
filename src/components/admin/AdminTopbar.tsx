@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
-  Search,
   Menu,
   User,
   LogOut,
@@ -13,10 +12,7 @@ import {
   Package,
   Home,
   ChevronDown,
-  Users,
-  ShoppingBag,
 } from "lucide-react";
-import { Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { cn, formatPrice } from "@/lib/utils";
@@ -33,29 +29,6 @@ const roleLabels: Record<string, string> = {
   STAFF: "Nhân viên",
 };
 
-type SearchResults = {
-  products: {
-    id: string;
-    name: string;
-    slug: string;
-    price: number;
-    image: string;
-  }[];
-  customers: {
-    id: string;
-    name: string;
-    email: string;
-    phone: string | null;
-  }[];
-  orders: {
-    id: string;
-    orderCode: string;
-    customerName: string;
-    total: number;
-    status: string;
-  }[];
-};
-
 export function AdminTopbar({ onMenuClick, title }: AdminTopbarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -63,17 +36,8 @@ export function AdminTopbar({ onMenuClick, title }: AdminTopbarProps) {
   const [userOpen, setUserOpen] = useState(false);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [loadingNotif, setLoadingNotif] = useState(false);
-  const [searchQ, setSearchQ] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<SearchResults>({
-    products: [],
-    customers: [],
-    orders: [],
-  });
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
@@ -83,30 +47,10 @@ export function AdminTopbar({ onMenuClick, title }: AdminTopbarProps) {
       if (userRef.current && !userRef.current.contains(e.target as Node)) {
         setUserOpen(false);
       }
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchOpen(false);
-      }
     };
     document.addEventListener("mousedown", onOutside);
     return () => document.removeEventListener("mousedown", onOutside);
   }, []);
-
-  useEffect(() => {
-    const q = searchQ.trim();
-    if (q.length < 2) {
-      setResults({ products: [], customers: [], orders: [] });
-      setSearching(false);
-      return;
-    }
-    setSearching(true);
-    const t = setTimeout(async () => {
-      const res = await api.adminSearch.query(q);
-      if (res.success && res.data) setResults(res.data);
-      else setResults({ products: [], customers: [], orders: [] });
-      setSearching(false);
-    }, 280);
-    return () => clearTimeout(t);
-  }, [searchQ]);
 
   const loadNotifications = async (showLoading = true) => {
     if (showLoading) setLoadingNotif(true);
@@ -127,14 +71,12 @@ export function AdminTopbar({ onMenuClick, title }: AdminTopbarProps) {
     const next = !notifOpen;
     setNotifOpen(next);
     setUserOpen(false);
-    setSearchOpen(false);
     if (next) void loadNotifications();
   };
 
   const toggleUser = () => {
     setUserOpen((v) => !v);
     setNotifOpen(false);
-    setSearchOpen(false);
   };
 
   const handleLogout = () => {
@@ -143,20 +85,9 @@ export function AdminTopbar({ onMenuClick, title }: AdminTopbarProps) {
     router.push("/dang-nhap");
   };
 
-  const go = (href: string) => {
-    setSearchOpen(false);
-    setSearchQ("");
-    router.push(href);
-  };
-
   const displayName = user?.name || "Admin";
   const shortName = displayName.split(" ").slice(-2).join(" ");
   const notifCount = pendingOrders.length;
-  const hasResults =
-    results.products.length +
-      results.customers.length +
-      results.orders.length >
-    0;
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 sm:px-6">
@@ -176,123 +107,7 @@ export function AdminTopbar({ onMenuClick, title }: AdminTopbarProps) {
         )}
       </div>
 
-      <div className="flex max-w-xl flex-1 items-center justify-end gap-2 sm:gap-3">
-        <div ref={searchRef} className="relative hidden max-w-xs flex-1 md:block">
-          <Input
-            placeholder="Tìm SP, đơn, khách..."
-            icon={<Search className="h-4 w-4" />}
-            value={searchQ}
-            onChange={(e) => {
-              setSearchQ(e.target.value);
-              setSearchOpen(true);
-              setNotifOpen(false);
-              setUserOpen(false);
-            }}
-            onFocus={() => setSearchOpen(true)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && searchQ.trim().length >= 2) {
-                e.preventDefault();
-                if (results.products[0]) go("/admin/san-pham");
-                else if (results.orders[0]) go("/admin/don-hang");
-                else if (results.customers[0])
-                  go(`/admin/khach-hang?id=${results.customers[0].id}`);
-              }
-            }}
-          />
-
-          {searchOpen && searchQ.trim().length >= 2 && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
-              {searching ? (
-                <p className="px-4 py-6 text-center text-sm text-gray-400">
-                  Đang tìm...
-                </p>
-              ) : !hasResults ? (
-                <p className="px-4 py-6 text-center text-sm text-gray-400">
-                  Không có kết quả cho &quot;{searchQ.trim()}&quot;
-                </p>
-              ) : (
-                <div className="max-h-96 overflow-y-auto py-1">
-                  {results.orders.length > 0 && (
-                    <div>
-                      <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                        Đơn hàng
-                      </p>
-                      {results.orders.map((o) => (
-                        <button
-                          key={o.id}
-                          type="button"
-                          onClick={() => go("/admin/don-hang")}
-                          className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary-50"
-                        >
-                          <ShoppingBag className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium text-gray-900">
-                              {o.orderCode}
-                            </span>
-                            <span className="block truncate text-xs text-gray-500">
-                              {o.customerName} · {formatPrice(o.total)}
-                            </span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {results.products.length > 0 && (
-                    <div>
-                      <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                        Sản phẩm
-                      </p>
-                      {results.products.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => go("/admin/san-pham")}
-                          className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary-50"
-                        >
-                          <Package className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium text-gray-900">
-                              {p.name}
-                            </span>
-                            <span className="block text-xs text-gray-500">
-                              {formatPrice(p.price)}
-                            </span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {results.customers.length > 0 && (
-                    <div>
-                      <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                        Khách hàng
-                      </p>
-                      {results.customers.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => go(`/admin/khach-hang?id=${c.id}`)}
-                          className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary-50"
-                        >
-                          <Users className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium text-gray-900">
-                              {c.name}
-                            </span>
-                            <span className="block truncate text-xs text-gray-500">
-                              {c.phone || c.email}
-                            </span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
+      <div className="flex items-center justify-end gap-2 sm:gap-3">
         <div ref={notifRef} className="relative">
           <button
             type="button"

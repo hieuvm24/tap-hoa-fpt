@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Image from "next/image";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-import { Button, Badge } from "@/components/ui";
+import { normalizeVi } from "@/lib/normalize-vi";
+import { Button, Badge, Input } from "@/components/ui";
 import { ProductModal } from "./ProductModal";
 import { Product } from "@/types";
 import { api } from "@/lib/api";
@@ -18,6 +19,10 @@ export function ProductTable() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">(
+    "all"
+  );
 
   const loadProducts = () => {
     setLoading(true);
@@ -30,7 +35,21 @@ export function ProductTable() {
     });
   };
 
-  useEffect(() => { loadProducts(); }, []);
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = normalizeVi(search);
+    return products.filter((p) => {
+      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (!q) return true;
+      const hay = normalizeVi(
+        `${p.name} ${p.sku} ${p.brand} ${p.category || ""}`
+      );
+      return hay.includes(q);
+    });
+  }, [products, search, statusFilter]);
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
@@ -55,9 +74,32 @@ export function ProductTable() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
-        <p className="text-sm text-gray-500">{products.length} sản phẩm</p>
-        <Button onClick={handleAdd} className="gap-2">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="w-full sm:max-w-sm">
+            <Input
+              placeholder="Tìm sản phẩm (tên, SKU, thương hiệu)..."
+              icon={<Search className="h-4 w-4" />}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as "all" | "active" | "inactive")
+            }
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="active">Đang bán</option>
+            <option value="inactive">Ngừng bán</option>
+          </select>
+          <p className="text-sm text-gray-500 whitespace-nowrap">
+            {filtered.length}/{products.length} sản phẩm
+          </p>
+        </div>
+        <Button onClick={handleAdd} className="gap-2 shrink-0">
           <Plus className="h-4 w-4" />
           Thêm sản phẩm
         </Button>
@@ -65,38 +107,78 @@ export function ProductTable() {
 
       {loading ? (
         <p className="text-gray-500">Đang tải...</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-gray-500">Không tìm thấy sản phẩm phù hợp.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Ảnh</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Tên</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 hidden md:table-cell">SKU</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Giá</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 hidden sm:table-cell">Tồn kho</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Trạng thái</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">Thao tác</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  Ảnh
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  Tên
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 hidden md:table-cell">
+                  SKU
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  Giá
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 hidden sm:table-cell">
+                  Tồn kho
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  Trạng thái
+                </th>
+                <th className="px-4 py-3 text-right font-medium text-gray-600">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {products.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+              {filtered.map((product) => (
+                <tr
+                  key={product.id}
+                  className="hover:bg-gray-50 transition-colors"
+                >
                   <td className="px-4 py-3">
-                    <Image src={product.image} alt={product.name} width={40} height={40} className="rounded-lg object-cover" />
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      width={40}
+                      height={40}
+                      className="rounded-lg object-cover"
+                    />
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-900 max-w-[200px] truncate">{product.name}</td>
-                  <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{product.sku}</td>
-                  <td className="px-4 py-3 font-medium text-primary-600">{formatPrice(product.price)}</td>
-                  <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{product.stock}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900 max-w-[200px] truncate">
+                    {product.name}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
+                    {product.sku}
+                  </td>
+                  <td className="px-4 py-3 font-medium text-primary-600">
+                    {formatPrice(product.price)}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
+                    {product.stock}
+                  </td>
                   <td className="px-4 py-3">
-                    <Badge variant={product.status === "active" ? "success" : "danger"}>
+                    <Badge
+                      variant={
+                        product.status === "active" ? "success" : "danger"
+                      }
+                    >
                       {product.status === "active" ? "Đang bán" : "Ngừng bán"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
-                      <button onClick={() => handleEdit(product)} className="rounded-lg p-1.5 text-gray-400 hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-primary-50 hover:text-primary-600 transition-colors"
+                      >
                         <Pencil className="h-4 w-4" />
                       </button>
                       {canDelete && (

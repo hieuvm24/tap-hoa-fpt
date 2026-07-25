@@ -111,7 +111,7 @@ function AdminCustomersPageContent() {
         <h1 className="text-2xl font-bold text-gray-900">Quản lý khách hàng</h1>
         <div className="w-full sm:max-w-xs">
           <Input
-            placeholder="Lọc theo tên, SĐT, email..."
+            placeholder="Tìm khách hàng (tên, SĐT, email)..."
             icon={<Search className="h-4 w-4" />}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}

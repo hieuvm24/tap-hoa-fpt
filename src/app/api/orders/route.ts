@@ -45,6 +45,36 @@ export async function GET(req: NextRequest) {
 
   if (status) where.status = status;
 
+  const search = searchParams.get("search")?.trim();
+  const from = searchParams.get("from")?.trim();
+  const to = searchParams.get("to")?.trim();
+  const isPostgres = (process.env.DATABASE_URL || "").startsWith("postgres");
+  const mode = isPostgres ? ({ mode: "insensitive" as const }) : {};
+
+  if (search) {
+    where.OR = [
+      { orderCode: { contains: search, ...mode } },
+      { customerName: { contains: search, ...mode } },
+      { customerPhone: { contains: search, ...mode } },
+      { customerEmail: { contains: search, ...mode } },
+    ];
+  }
+
+  if (from || to) {
+    const createdAt: { gte?: Date; lte?: Date } = {};
+    if (from) {
+      const d = new Date(from);
+      d.setHours(0, 0, 0, 0);
+      createdAt.gte = d;
+    }
+    if (to) {
+      const d = new Date(to);
+      d.setHours(23, 59, 59, 999);
+      createdAt.lte = d;
+    }
+    where.createdAt = createdAt;
+  }
+
   const orders = await prisma.order.findMany({
     where,
     include: orderInclude,

@@ -417,12 +417,32 @@ export const api = {
         revenueChart: import("@/types").ChartData[];
         ordersChart: import("@/types").ChartData[];
       }>("/dashboard/stats"),
-    reports: () =>
-      request<{
+    reports: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<{
+        range: { from: string; to: string; preset: string };
+        summary: {
+          revenue: number;
+          orderCount: number;
+          avgOrder: number;
+          cancelledCount: number;
+          cancelRate: number;
+          paidCount: number;
+          pickupCount: number;
+          deliveryCount: number;
+          discountTotal: number;
+          shippingTotal: number;
+        };
         monthlyRevenue: import("@/types").ChartData[];
-        topProducts: import("@/types").ChartData[];
+        dailyRevenue: import("@/types").ChartData[];
+        topProducts: (import("@/types").ChartData & { revenue?: number })[];
         topCustomers: import("@/types").ChartData[];
-      }>("/dashboard/reports"),
+        ordersByStatus: import("@/types").ChartData[];
+        revenueByPayment: import("@/types").ChartData[];
+        revenueByCategory: import("@/types").ChartData[];
+        lowStockItems: (import("@/types").ChartData & { sku?: string })[];
+      }>(`/dashboard/reports${qs}`);
+    },
   },
 
   store: {
