@@ -3,7 +3,7 @@ import type { StoreInfo } from "@/types";
 /** Fallback khi API store chưa sẵn sàng — nguồn duy nhất cho default store */
 export const DEFAULT_STORE: StoreInfo = {
   name: "Tạp Hóa FPT",
-  slogan: "Thực phẩm sạch - Giao tận nhà",
+  slogan: "Siêu thị mini quê — Online & tại quầy",
   address: "Gián Khẩu, Xã Gia Trấn, Huyện Gia Viễn, Ninh Bình",
   phone: "0388025515",
   email: "vuminhhieunp@mail.com",
@@ -11,7 +11,7 @@ export const DEFAULT_STORE: StoreInfo = {
   zalo: "0388025515",
   openHours: "6:00 - 21:00 hàng ngày",
   description:
-    "Cửa hàng tạp hóa giao hàng tận nhà, thực phẩm sạch mỗi ngày.",
+    "Tạp hóa / siêu thị mini ở Gia Viễn: bán thực phẩm, đồ uống, gia vị, bánh kẹo, đông lạnh và đồ gia dụng. Mua online giao tận nơi hoặc đến lấy tại quầy.",
   latitude: 20.333,
   longitude: 105.92,
   mapEmbedUrl: null,

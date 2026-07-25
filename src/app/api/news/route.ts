@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession, isAdminRole } from "@/lib/auth-server";
+import { getSession, isAdminRole, isOwnerRole } from "@/lib/auth-server";
 import { apiSuccess, apiError } from "@/lib/mappers";
 
 function slugify(text: string) {
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session || !isAdminRole(session.role)) return apiError("Forbidden", 403);
+  if (!session || !isOwnerRole(session.role)) return apiError("Chi chu cua hang", 403);
 
   const body = await req.json();
   const title = String(body.title || "").trim();

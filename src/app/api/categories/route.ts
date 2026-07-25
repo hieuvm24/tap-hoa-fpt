@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession, isAdminRole } from "@/lib/auth-server";
+import { getSession, isOwnerRole } from "@/lib/auth-server";
 import { mapCategory, apiSuccess, apiError } from "@/lib/mappers";
 
 export async function GET() {
@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session || !isAdminRole(session.role)) return apiError("Forbidden", 403);
+  if (!session || !isOwnerRole(session.role)) return apiError("Chỉ chủ cửa hàng", 403);
 
   const body = await req.json();
   const name = String(body.name || "").trim();

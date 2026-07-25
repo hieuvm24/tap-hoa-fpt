@@ -12,8 +12,10 @@ export interface AiChatContext {
     email: string;
     address: string;
     openHours: string;
+    description?: string;
   };
   products: Product[];
+  categories?: { name: string; slug: string; count: number }[];
   promotions?: { title: string; discount: number }[];
 }
 
@@ -26,47 +28,108 @@ export interface AiChatResult {
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
+const STOP_WORDS = new Set([
+  "co",
+  "khong",
+  "a",
+  "ay",
+  "oi",
+  "nhe",
+  "nha",
+  "duoc",
+  "giup",
+  "cho",
+  "toi",
+  "minh",
+  "anh",
+  "chi",
+  "em",
+  "shop",
+  "ban",
+  "mua",
+  "tim",
+  "xem",
+  "can",
+  "gia",
+  "bao",
+  "nhieu",
+  "hang",
+  "the",
+  "nao",
+  "o",
+  "tai",
+  "cua",
+  "hang",
+]);
+
+function normalizeVi(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[?!.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanKeyword(raw: string) {
+  return normalizeVi(raw)
+    .split(" ")
+    .filter((t) => t && !STOP_WORDS.has(t) && t.length > 1)
+    .join(" ")
+    .trim();
+}
+
 function buildSystemPrompt(ctx: AiChatContext): string {
   const catalog = ctx.products
-    .slice(0, 60)
+    .slice(0, 80)
     .map(
       (p) =>
-        `- ${p.name} | giá ${formatPrice(p.price)} | danh mục ${p.category} | tồn ${p.stock} | đánh giá ${p.rating}/5`
+        `- ${p.name} | ${formatPrice(p.price)} | ${p.category} | ton ${p.stock}`
     )
     .join("\n");
+  const cats =
+    ctx.categories
+      ?.map((c) => `${c.name} (${c.count})`)
+      .join(", ") || "thuc pham, do uong, gia vi, banh keo, do gia dung...";
   const promos =
-    ctx.promotions?.map((p) => `- ${p.title} (giảm ${p.discount}%)`).join("\n") ||
-    "- Mã ANPHU10 giảm 10% đơn hàng";
+    ctx.promotions?.map((p) => `- ${p.title} (giam ${p.discount}%)`).join("\n") ||
+    "- Ma ANPHU10 giam 10%";
 
-  return `Bạn là nhân viên tư vấn online của cửa hàng "${ctx.store.name}".
-Nói chuyện tự nhiên như người bán hàng thật, tiếng Việt, ngắn gọn, lịch sự. Có thể dùng markdown nhẹ (in đậm).
+  return `Ban la nhan vien tu van cua "${ctx.store.name}" — tiem tap hoa / sieu thi mini o que (Gia Vien, Ninh Binh).
+Noi tieng Viet tu nhien, ngan gon, lich su. Co the dung **in dam**.
 
-Thông tin cửa hàng:
-- Địa chỉ: ${ctx.store.address}
-- Điện thoại / hotline: ${ctx.store.phone}
-- Zalo: ${ctx.store.zalo}
+Cua hang:
+- Vua ban online (web), vua ban truc tiep tai quay
+- Ban nhu sieu thi mini: thuc pham, do uong, gia vi, banh keo, do dong lanh, do gia dung, do dung ca nhan...
+- Dia chi: ${ctx.store.address}
+- Hotline/Zalo: ${ctx.store.phone}
 - Facebook: ${ctx.store.facebook}
 - Email: ${ctx.store.email}
-- Giờ mở cửa: ${ctx.store.openHours}
+- Gio mo cua: ${ctx.store.openHours}
+${ctx.store.description ? `- Mo ta: ${ctx.store.description}` : ""}
 
-Chính sách:
-- Phí ship ${formatPrice(SHIPPING_FEE)}, miễn phí ship từ đơn ${formatPrice(FREE_SHIP_THRESHOLD)}
-- Giao nội thị khoảng 2 giờ, vùng ven 3-4 giờ (trong giờ mở cửa)
-- Thanh toán: COD, chuyển khoản, VNPay
-- Đổi trả trong 24h nếu hàng lỗi / không đúng mô tả
-- Đặt hàng: thêm vào giỏ → thanh toán trên website
+Chinh sach:
+- Phi ship ${formatPrice(SHIPPING_FEE)}, freeship tu ${formatPrice(FREE_SHIP_THRESHOLD)}
+- Giao noi thi ~2 gio, vung ven 3-4 gio (trong gio mo cua)
+- Den lay tai quay: khong tinh ship
+- Thanh toan: COD, chuyen khoan, VNPay; tai quay: tien mat / chuyen khoan
+- Doi tra 24h neu hang loi
 
-Khuyến mãi đang chạy:
+Danh muc: ${cats}
+
+Khuyen mai:
 ${promos}
 
-Sản phẩm đang bán (tham khảo):
+San pham (tham khao):
 ${catalog}
 
-Quy tắc trả lời:
-1. Hỏi giá / còn hàng / gợi ý món → dựa vào danh sách sản phẩm ở trên, nêu tên + giá cụ thể.
-2. Không bịa sản phẩm không có trong danh sách.
-3. Nếu không chắc, hướng khách gọi ${ctx.store.phone} hoặc xem mục Danh mục trên web.
-4. Trả lời đúng trọng tâm câu hỏi, tối đa khoảng 8-10 dòng.`;
+Quy tac:
+1. Tra loi DUNG trong tam cau hoi (gia, con hang, ship, gio mo, den lay...).
+2. Chi gioi thieu san pham co trong danh sach tren; khong bia.
+3. Neu khong chac → goi ${ctx.store.phone} hoac den cua hang.
+4. Toi da ~8 dong.`;
 }
 
 async function callOpenAI(
@@ -84,10 +147,10 @@ async function callOpenAI(
       },
       body: JSON.stringify({
         model: OPENAI_MODEL,
-        temperature: 0.35,
+        temperature: 0.3,
         messages: [
           { role: "system", content: buildSystemPrompt(ctx) },
-          ...history.slice(-10),
+          ...history.slice(-8),
           { role: "user", content: message },
         ],
       }),
@@ -100,26 +163,22 @@ async function callOpenAI(
   }
 }
 
-function normalizeVi(s: string) {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .trim();
-}
-
 function findProducts(query: string, products: Product[], limit = 4): Product[] {
-  const found = searchProductsByKeyword(query, products, limit);
+  const cleaned = cleanKeyword(query) || normalizeVi(query);
+  const found = searchProductsByKeyword(cleaned, products, limit);
   if (found.length) return found;
 
-  const q = normalizeVi(query);
+  const q = cleaned;
+  const tokens = q.split(/\s+/).filter(Boolean);
   const scored = products
     .map((p) => {
-      const hay = normalizeVi(`${p.name} ${p.brand} ${p.category} ${p.description}`);
+      const hay = normalizeVi(
+        `${p.name} ${p.brand} ${p.category} ${p.description}`
+      );
       let score = 0;
-      for (const token of q.split(/\s+/).filter(Boolean)) {
-        if (hay.includes(token)) score += token.length > 2 ? 2 : 1;
+      if (hay.includes(q)) score += 10;
+      for (const token of tokens) {
+        if (hay.includes(token)) score += token.length > 2 ? 3 : 1;
       }
       return { p, score };
     })
@@ -137,85 +196,227 @@ function listProducts(products: Product[]) {
     .join("\n");
 }
 
+type Intent =
+  | "greeting"
+  | "hours"
+  | "shipping"
+  | "payment"
+  | "promo"
+  | "contact"
+  | "location"
+  | "howto"
+  | "return"
+  | "walkin"
+  | "catalog"
+  | "featured"
+  | "product"
+  | "unknown";
+
+function detectIntent(raw: string, normalized: string): Intent {
+  if (
+    /^(xin chao|chao shop|chao|hello|hi|hey)(\s|$)/i.test(normalized) ||
+    normalized === "chao"
+  ) {
+    return "greeting";
+  }
+  if (/(gio mo|mo cua|may gio|giờ mở)/i.test(raw) || normalized.includes("gio mo")) {
+    return "hours";
+  }
+  if (
+    /(ship|giao hang|phi giao|freeship|mien phí ship|giao tan)/i.test(raw) ||
+    normalized.includes("phi ship")
+  ) {
+    return "shipping";
+  }
+  if (/(thanh toan|cod|vnpay|chuyen khoan|qr|tien mat)/i.test(raw)) {
+    return "payment";
+  }
+  if (/(khuyen mai|voucher|giam gia|ma giam|uu dai)/i.test(raw)) {
+    return "promo";
+  }
+  if (/(lien he|hotline|zalo|so dien thoai|sdt)\b/i.test(raw)) {
+    return "contact";
+  }
+  if (/(ban do|chi duong|o dau|dia chi|map)/i.test(raw)) {
+    return "location";
+  }
+  if (/(dat hang|mua the nao|cach mua|huong dan dat|order)/i.test(raw)) {
+    return "howto";
+  }
+  if (/(doi tra|hoan tien|hang loi)/i.test(raw)) {
+    return "return";
+  }
+  if (
+    /(den lay|tai quay|mua truc tiep|toi shop|den shop|mua tai cua hang|lay hang)/i.test(
+      raw
+    ) ||
+    /(den lay|tai quay|truc tiep)/i.test(normalized)
+  ) {
+    return "walkin";
+  }
+  if (
+    /(ban gi|co nhung gi|danh muc|sieu thi|tap hoa ban|hang hoa)/i.test(raw) ||
+    /(ban gi|co gi ban)/i.test(normalized)
+  ) {
+    return "catalog";
+  }
+  if (
+    /(ban chay|noi bat|goi y mon|goi y mua|nen mua gi|hom nay mua)/i.test(
+      normalized
+    ) ||
+    /(gợi ý|bán chạy|nên mua gì)/i.test(raw)
+  ) {
+    return "featured";
+  }
+  if (
+    /(gia|bao nhieu|con khong|con hang|co ban|co\s|tim|mua|can|xem)\b/i.test(
+      raw
+    ) ||
+    raw.length <= 40
+  ) {
+    return "product";
+  }
+  return "unknown";
+}
+
+function extractProductQuery(raw: string, normalized: string): string | null {
+  const patterns = [
+    /(?:giá|bao nhiêu|còn không|còn hàng|có bán|có)\s+(.+)/i,
+    /(?:bán|mua|tìm|xem|cần|gợi ý)\s+(.+)/i,
+    /(.+?)\s+(?:bao nhiêu|giá bao nhiêu|còn không)/i,
+  ];
+  for (const re of patterns) {
+    const m = raw.match(re);
+    if (m?.[1]) {
+      const cleaned = cleanKeyword(m[1]);
+      if (cleaned.length >= 2) return cleaned;
+    }
+  }
+
+  const cats = [
+    ["bot giat", "bot giat"],
+    ["dau goi", "dau goi"],
+    ["kem danh rang", "kem"],
+    ["nuoc mam", "nuoc mam"],
+    ["dau an", "dau an"],
+    ["mi goi", "mi"],
+    ["sua tuoi", "sua"],
+    ["trai cay", "trai cay"],
+    ["rau cu", "rau"],
+    ["banh keo", "banh"],
+    ["dong lanh", "dong lanh"],
+    ["gia vi", "gia vi"],
+    ["do uong", "nuoc"],
+    ["gao", "gao"],
+    ["sua", "sua"],
+    ["mi", "mi"],
+    ["cafe", "cafe"],
+    ["ca phe", "ca phe"],
+    ["oreo", "oreo"],
+    ["coca", "coca"],
+    ["lavie", "lavie"],
+  ];
+  for (const [needle, key] of cats) {
+    if (normalized.includes(needle)) return key;
+  }
+
+  const cleaned = cleanKeyword(raw);
+  if (cleaned.length >= 2 && cleaned.length <= 40) return cleaned;
+  return null;
+}
+
 function ruleBasedReply(message: string, ctx: AiChatContext): AiChatResult {
-  const { store, products, promotions } = ctx;
+  const { store, products, promotions, categories } = ctx;
   const raw = message.trim();
   const normalized = normalizeVi(raw);
+  const intent = detectIntent(raw, normalized);
 
-  if (/(xin chao|chao shop|hello|hi\b|chào)/i.test(raw) || normalized === "chao") {
+  if (intent === "greeting") {
     return {
-      text: `Chào anh/chị, mình hỗ trợ đặt hàng giúp **${store.name}** ạ.\nAnh/chị cần tìm món gì, hỏi phí ship, giờ mở cửa hay cách thanh toán cứ nhắn mình nhé.`,
+      text: `Chào anh/chị ạ, em hỗ trợ **${store.name}**.\nShop vừa bán online vừa bán tại quầy — đồ ăn uống, gia vị, bánh kẹo, đồ dùng nhà… như siêu thị mini.\nAnh/chị cần hỏi gì (giá, còn hàng, ship, giờ mở cửa) cứ nhắn em nhé.`,
       source: "rules",
     };
   }
 
-  if (/(gio mo|mo cua|may gio mo|giờ mở)/i.test(raw) || normalized.includes("gio mo")) {
+  if (intent === "hours") {
     return {
-      text: `Shop mở cửa **${store.openHours}**.\nĐặt online được mọi lúc; đơn ngoài giờ sẽ xử lý vào ca làm việc tiếp theo.`,
+      text: `Shop mở **${store.openHours}**.\n• Online: đặt mọi lúc, ngoài giờ xử lý ca sau.\n• Đến mua trực tiếp: trong giờ mở cửa tại ${store.address}.`,
       source: "rules",
     };
   }
 
-  if (/(ship|giao hang|phi giao|freeship|miễn phí ship)/i.test(raw)) {
+  if (intent === "shipping") {
     return {
-      text: `Về giao hàng:\n• Phí ship **${formatPrice(SHIPPING_FEE)}**\n• **Freeship** từ đơn **${formatPrice(FREE_SHIP_THRESHOLD)}**\n• Nội thị khoảng 2 giờ, vùng ven 3–4 giờ (trong giờ mở cửa)\nĐịa chỉ giao lấy theo sổ địa chỉ khi thanh toán.`,
+      text: `Giao hàng online:\n• Phí ship **${formatPrice(SHIPPING_FEE)}**\n• Freeship từ **${formatPrice(FREE_SHIP_THRESHOLD)}**\n• Nội thị ~2 giờ, vùng ven 3–4 giờ\n\nHoặc anh/chị **đến lấy tại quầy** thì không tính ship.`,
       source: "rules",
     };
   }
 
-  if (/(thanh toan|cod|vnpay|chuyen khoan|qr)/i.test(raw)) {
+  if (intent === "payment") {
     return {
-      text: `Shop nhận 3 hình thức:\n1. **COD** — trả tiền khi nhận hàng\n2. **Chuyển khoản** — thông tin TK hiện ở bước thanh toán\n3. **VNPay** — quét QR / app ngân hàng\nAnh/chị chọn lúc vào trang Thanh toán là được.`,
+      text: `Thanh toán:\n• **Online:** COD, chuyển khoản, VNPay\n• **Tại quầy:** tiền mặt hoặc chuyển khoản\nAnh/chị chọn lúc thanh toán trên web hoặc trả khi nhận hàng / tại shop.`,
       source: "rules",
     };
   }
 
-  if (/(khuyen mai|voucher|giam gia|ma giam|uu dai)/i.test(raw)) {
+  if (intent === "promo") {
     const promoLines =
       promotions && promotions.length
         ? promotions.map((p) => `• ${p.title} (−${p.discount}%)`).join("\n")
         : "• Đang cập nhật chương trình mới";
     return {
-      text: `Ưu đãi hiện có:\n${promoLines}\n\nMã nhanh: **ANPHU10** giảm 10% (nhập ở giỏ hàng / thanh toán).`,
+      text: `Ưu đãi hiện có:\n${promoLines}\n\nMã nhanh: **ANPHU10** giảm 10% (nhập ở giỏ / thanh toán). Áp dụng cả đơn online.`,
       source: "rules",
     };
   }
 
-  if (/(lien he|hotline|zalo|dia chi|so dien thoai|sdt)/i.test(raw)) {
+  if (intent === "contact") {
     return {
-      text: `**${store.name}**\n• Hotline: **${store.phone}**\n• Zalo: **${store.zalo}**\n• Email: ${store.email}\n• Địa chỉ: ${store.address}`,
+      text: `**${store.name}**\n• Hotline / Zalo: **${store.phone}**\n• Email: ${store.email}\n• Địa chỉ: ${store.address}\n• Facebook: ${store.facebook}`,
       source: "rules",
     };
   }
 
-  if (/(ban do|chi duong|duong di|o dau|map)/i.test(raw)) {
+  if (intent === "location") {
     return {
-      text: `Cửa hàng tại: **${store.address}**\nAnh/chị vào mục **Liên hệ** trên web để xem bản đồ.`,
+      text: `Cửa hàng tại: **${store.address}**.\nAnh/chị vào mục **Liên hệ** trên web xem bản đồ, hoặc gọi **${store.phone}** hỏi đường.`,
       source: "rules",
     };
   }
 
-  if (/(dat hang|mua the nao|cach mua|huong dan dat)/i.test(raw)) {
+  if (intent === "howto") {
     return {
-      text: `Cách đặt hàng nhanh:\n1. Chọn sản phẩm → **Thêm giỏ**\n2. Vào **Giỏ hàng** kiểm tra số lượng\n3. Bấm **Thanh toán**, điền địa chỉ\n4. Chọn COD / CK / VNPay → xác nhận\nCó tài khoản thì theo dõi đơn trong mục **Tài khoản → Đơn hàng**.`,
+      text: `**Mua online:** chọn hàng → Thêm giỏ → Thanh toán → chờ giao hoặc chọn đến lấy.\n**Mua tại quầy:** đến ${store.address} trong giờ **${store.openHours}**, chọn hàng thanh toán luôn.\nTheo dõi đơn online: Tài khoản → Đơn hàng.`,
       source: "rules",
     };
   }
 
-  if (/(doi tra|hoan tien|hang loi)/i.test(raw)) {
+  if (intent === "return") {
     return {
-      text: `Đổi trả trong **24 giờ** nếu hàng hỏng, sai mẫu hoặc thiếu món.\nGiữ hóa đơn / mã đơn và liên hệ **${store.phone}** hoặc Zalo **${store.zalo}** để được hỗ trợ.`,
+      text: `Đổi trả trong **24 giờ** nếu hàng hỏng / sai / thiếu.\nGiữ hóa đơn hoặc mã đơn, liên hệ **${store.phone}** (Zalo cũng được).`,
       source: "rules",
     };
   }
 
-  // Bán chạy / gợi ý chung — ưu tiên trước khi tách từ khóa
-  if (
-    /(ban chay|noi bat|goi y mon|goi y mua|nen mua gi|hom nay mua gi|goi y\??$)/i.test(
-      normalized
-    ) ||
-    /(gợi ý món|bán chạy|nên mua gì)/i.test(raw)
-  ) {
+  if (intent === "walkin") {
+    return {
+      text: `Anh/chị có thể **đến mua / lấy hàng tại quầy**:\n• Địa chỉ: **${store.address}**\n• Giờ: **${store.openHours}**\n• Không tính ship khi đến lấy\nĐặt trước trên web rồi ghé lấy cũng được ạ.`,
+      source: "rules",
+    };
+  }
+
+  if (intent === "catalog") {
+    const catText =
+      categories && categories.length
+        ? categories.map((c) => `• ${c.name} (${c.count} sp)`).join("\n")
+        : "• Thực phẩm, đồ uống, gia vị, bánh kẹo, đông lạnh, đồ gia dụng…";
+    return {
+      text: `**${store.name}** là tạp hóa / siêu thị mini — bán online + tại quầy.\nCác nhóm hàng đang có:\n${catText}\n\nAnh/chị muốn xem nhóm nào (vd: “có mì gói không?”) cứ nhắn tên nhé.`,
+      source: "rules",
+    };
+  }
+
+  if (intent === "featured") {
     const featured = [...products]
       .sort(
         (a, b) =>
@@ -225,72 +426,42 @@ function ruleBasedReply(message: string, ctx: AiChatContext): AiChatResult {
       )
       .slice(0, 5);
     return {
-      text: `Mấy món đang bán chạy ở shop:\n\n${listProducts(featured)}\n\nAnh/chị muốn tìm loại nào cụ thể (mì, sữa, nước…) cứ nhắn tên nhé.`,
+      text: `Mấy món đang bán chạy:\n\n${listProducts(featured)}\n\nCần loại nào cụ thể cứ nhắn tên (mì, sữa, nước, bánh…).`,
       products: featured,
       source: "rules",
     };
   }
 
-  // Hỏi giá / còn hàng theo tên sản phẩm
-  const priceMatch = raw.match(/(?:giá|bao nhiêu|còn không|còn hàng|có bán)\s+(.+)/i);
-  const buyMatch = raw.match(/(?:có|bán|mua|tìm|gợi ý|xem|cần)\s+(.+)/i);
-  let keyword =
-    priceMatch?.[1]?.trim() ||
-    buyMatch?.[1]?.trim() ||
-    null;
-
-  if (keyword) {
-    keyword = keyword.replace(/[?.!]+$/g, "").trim();
-  }
-
-  if (!keyword) {
-    const cats = [
-      "rau",
-      "cu",
-      "trai cay",
-      "sua",
-      "mi",
-      "nuoc",
-      "gia vi",
-      "banh",
-      "keo",
-      "dong lanh",
-      "cafe",
-      "ca phe",
-      "gao",
-      "tom",
-      "thit",
-      "trung",
-      "dau",
-    ];
-    keyword = cats.find((c) => normalized.includes(c)) || null;
-  }
-
-  // Câu chỉ gồm tên món: "sữa tươi", "mì hảo hảo"
-  if (!keyword && raw.length >= 2 && raw.length <= 40) {
-    const guess = findProducts(raw, products, 3);
-    if (guess.length) keyword = raw;
-  }
-
+  // product / unknown → thử tìm hàng
+  const keyword = extractProductQuery(raw, normalized);
   if (keyword) {
     const found = findProducts(keyword, products, 4);
     if (found.length) {
       return {
-        text: `Shop đang có mấy món liên quan **${keyword}**:\n\n${listProducts(found)}\n\nAnh/chị bấm vào sản phẩm để xem chi tiết hoặc thêm giỏ hàng nhé.`,
+        text: `Shop đang có liên quan **${keyword}**:\n\n${listProducts(found)}\n\nMua online thêm giỏ, hoặc đến quầy lấy trong giờ mở cửa nhé.`,
         products: found,
         source: "rules",
       };
     }
-    return {
-      text: `Kho chưa thấy món khớp “${keyword}”. Anh/chị thử tên khác, vào **Danh mục**, hoặc gọi **${store.phone}** hỏi trực tiếp.`,
-      source: "rules",
-    };
+    if (intent === "product") {
+      return {
+        text: `Kho chưa thấy món khớp “${keyword}”. Thử tên khác, xem **Danh mục**, gọi **${store.phone}**, hoặc ghé ${store.address} hỏi trực tiếp.`,
+        source: "rules",
+      };
+    }
   }
 
   return {
-    text: `Anh/chị hỏi mình kiểu này là được ạ:\n• “Có sữa tươi không?”\n• “Phí ship bao nhiêu?”\n• “Giờ mở cửa?”\n• “Thanh toán VNPay thế nào?”\n• “Gợi ý mì gói”\n\nHoặc gọi **${store.phone}**.`,
+    text: `Anh/chị hỏi kiểu này em trả lời được ngay:\n• “Có sữa tươi không?”\n• “Phí ship bao nhiêu?”\n• “Đến lấy hàng được không?”\n• “Giờ mở cửa?”\n• “Shop bán những gì?”\n\nHoặc gọi **${store.phone}**.`,
     source: "rules",
   };
+}
+
+function isFallbackHelp(text: string) {
+  return (
+    text.includes("Anh/chị hỏi kiểu này") ||
+    text.includes("Anh/chị có thể hỏi")
+  );
 }
 
 export async function generateAiReply(input: {
@@ -298,16 +469,14 @@ export async function generateAiReply(input: {
   history?: { role: "user" | "assistant"; content: string }[];
   context: AiChatContext;
 }): Promise<AiChatResult> {
-  // Ưu tiên rule khi đã khớp FAQ / tìm được sản phẩm — trả lời đúng số liệu cửa hàng
   const ruled = ruleBasedReply(input.message, input.context);
-  const isGenericHelp =
-    ruled.text.includes("Anh/chị hỏi mình kiểu này") ||
-    ruled.text.includes("Anh/chị có thể hỏi");
 
-  if (!isGenericHelp) {
+  // FAQ / tìm được hàng → dùng rule (đúng số liệu)
+  if (!isFallbackHelp(ruled.text)) {
     return ruled;
   }
 
+  // Câu tự do → OpenAI nếu có key
   const openaiText = await callOpenAI(
     input.message,
     input.history || [],
@@ -321,5 +490,6 @@ export async function generateAiReply(input: {
       source: "openai",
     };
   }
+
   return ruled;
 }

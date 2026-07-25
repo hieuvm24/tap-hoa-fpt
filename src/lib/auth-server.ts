@@ -70,4 +70,8 @@ export function isAdminRole(role: UserRole): boolean {
   return role === "OWNER" || role === "STAFF";
 }
 
+export function isOwnerRole(role: UserRole): boolean {
+  return role === "OWNER";
+}
+
 export { COOKIE_NAME };

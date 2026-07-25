@@ -15,21 +15,24 @@ import {
   Settings,
   Store,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { ADMIN_MENU, hasPermission } from "@/lib/permissions";
 
-const menuItems = [
-  { href: "/admin", label: "Tổng quan", icon: LayoutDashboard },
-  { href: "/admin/san-pham", label: "Sản phẩm", icon: Package },
-  { href: "/admin/danh-muc", label: "Danh mục", icon: FolderTree },
-  { href: "/admin/don-hang", label: "Đơn hàng", icon: ShoppingBag },
-  { href: "/admin/khach-hang", label: "Khách hàng", icon: Users },
-  { href: "/admin/khuyen-mai", label: "Khuyến mãi", icon: Tag },
-  { href: "/admin/voucher", label: "Voucher", icon: Ticket },
-  { href: "/admin/tin-tuc", label: "Tin tức", icon: Newspaper },
-  { href: "/admin/bao-cao", label: "Báo cáo", icon: BarChart3 },
-  { href: "/admin/cai-dat", label: "Cài đặt", icon: Settings },
-];
+const iconByHref: Record<string, LucideIcon> = {
+  "/admin": LayoutDashboard,
+  "/admin/san-pham": Package,
+  "/admin/danh-muc": FolderTree,
+  "/admin/don-hang": ShoppingBag,
+  "/admin/khach-hang": Users,
+  "/admin/khuyen-mai": Tag,
+  "/admin/voucher": Ticket,
+  "/admin/tin-tuc": Newspaper,
+  "/admin/bao-cao": BarChart3,
+  "/admin/cai-dat": Settings,
+};
 
 interface AdminSidebarProps {
   isOpen: boolean;
@@ -38,6 +41,12 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const role = user?.role;
+
+  const visibleItems = ADMIN_MENU.filter((item) =>
+    hasPermission(role, item.permission)
+  );
 
   return (
     <>
@@ -54,21 +63,32 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center justify-between px-4 border-b border-gray-800">
+        <div className="flex h-16 items-center justify-between border-b border-gray-800 px-4">
           <Link href="/admin" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500">
               <Store className="h-4 w-4" />
             </div>
-            <span className="font-bold">Admin Panel</span>
+            <div>
+              <span className="block text-sm font-bold leading-tight">
+                Admin Panel
+              </span>
+              <span className="text-[10px] text-gray-400">
+                {role === "OWNER" ? "Chủ cửa hàng" : "Nhân viên"}
+              </span>
+            </div>
           </Link>
-          <button onClick={onClose} className="lg:hidden p-1 rounded hover:bg-gray-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 hover:bg-gray-800 lg:hidden"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="p-3 space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
+        <nav className="space-y-1 p-3">
+          {visibleItems.map((item) => {
+            const Icon = iconByHref[item.href] || Package;
             const isActive =
               item.href === "/admin"
                 ? pathname === "/admin"
@@ -93,10 +113,17 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           })}
         </nav>
 
+        {role === "STAFF" && (
+          <p className="px-4 text-[11px] leading-relaxed text-gray-500">
+            Nhân viên xử lý đơn, kho hàng và khách. Báo cáo / khuyến mãi / cài
+            đặt do chủ cửa hàng quản lý.
+          </p>
+        )}
+
         <div className="absolute bottom-4 left-0 right-0 px-4">
           <Link
             href="/"
-            className="flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+            className="flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
           >
             ← Về trang chủ
           </Link>

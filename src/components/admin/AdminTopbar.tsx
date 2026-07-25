@@ -18,6 +18,7 @@ import { Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { cn, formatPrice } from "@/lib/utils";
+import { isOwner } from "@/lib/permissions";
 import type { Order } from "@/types";
 
 interface AdminTopbarProps {
@@ -227,14 +228,16 @@ export function AdminTopbar({ onMenuClick, title }: AdminTopbarProps) {
               </div>
 
               <div className="py-1">
-                <Link
-                  href="/admin/cai-dat"
-                  onClick={() => setUserOpen(false)}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
-                >
-                  <Settings className="h-4 w-4" />
-                  Cài đặt cửa hàng
-                </Link>
+                {isOwner(user?.role) && (
+                  <Link
+                    href="/admin/cai-dat"
+                    onClick={() => setUserOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Cài đặt cửa hàng
+                  </Link>
+                )}
                 <Link
                   href="/"
                   onClick={() => setUserOpen(false)}

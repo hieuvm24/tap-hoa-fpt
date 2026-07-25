@@ -8,8 +8,12 @@ import { Button, Badge } from "@/components/ui";
 import { ProductModal } from "./ProductModal";
 import { Product } from "@/types";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { isOwner } from "@/lib/permissions";
 
 export function ProductTable() {
+  const { user } = useAuth();
+  const canDelete = isOwner(user?.role);
   const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -95,9 +99,14 @@ export function ProductTable() {
                       <button onClick={() => handleEdit(product)} className="rounded-lg p-1.5 text-gray-400 hover:bg-primary-50 hover:text-primary-600 transition-colors">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button onClick={() => handleDelete(product.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

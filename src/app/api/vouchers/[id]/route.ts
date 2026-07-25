@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession, isAdminRole } from "@/lib/auth-server";
+import { getSession, isOwnerRole } from "@/lib/auth-server";
 import { apiSuccess, apiError } from "@/lib/mappers";
 
 export async function PUT(
@@ -8,7 +8,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session || !isAdminRole(session.role)) return apiError("Forbidden", 403);
+  if (!session || !isOwnerRole(session.role)) return apiError("Chi chu cua hang", 403);
 
   const { id } = await params;
   const body = await req.json();
@@ -32,7 +32,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session || !isAdminRole(session.role)) return apiError("Forbidden", 403);
+  if (!session || !isOwnerRole(session.role)) return apiError("Chi chu cua hang", 403);
 
   const { id } = await params;
   try {

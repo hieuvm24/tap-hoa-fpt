@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/db";
-import { getSession, isAdminRole } from "@/lib/auth-server";
+import { getSession, isOwnerRole } from "@/lib/auth-server";
 import { apiSuccess, apiError } from "@/lib/mappers";
 
 export async function GET() {
   const session = await getSession();
-  if (!session || !isAdminRole(session.role)) {
-    return apiError("Forbidden", 403);
+  if (!session || !isOwnerRole(session.role)) {
+    return apiError("Chỉ chủ cửa hàng xem báo cáo", 403);
   }
 
   const monthLabels = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];

@@ -140,14 +140,15 @@ async function main() {
     data: {
       id: "default",
       name: "Tạp Hóa FPT",
-      slogan: "Thực phẩm sạch - Giao tận nhà",
+      slogan: "Siêu thị mini quê — Online & tại quầy",
       address: "Gián Khẩu, Xã Gia Trấn, Huyện Gia Viễn, Ninh Bình",
       phone: "0388025515",
       email: "vuminhhieunp@mail.com",
       facebook: "https://www.facebook.com/vu.minh.hieu.503599",
       zalo: "0388025515",
       openHours: "6:00 - 21:00 hàng ngày",
-      description: "Cửa hàng tạp hóa giao hàng tận nhà, thực phẩm sạch mỗi ngày.",
+      description:
+        "Tạp hóa / siêu thị mini ở Gia Viễn: thực phẩm, đồ uống, gia vị, bánh kẹo, đông lạnh và đồ gia dụng. Mua online hoặc đến lấy tại quầy.",
       latitude: 20.333,
       longitude: 105.92,
       bankName: "Vietcombank",

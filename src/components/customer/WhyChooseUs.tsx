@@ -1,6 +1,6 @@
 import {
-  Leaf,
-  BadgePercent,
+  Store,
+  ShoppingBag,
   Truck,
   RefreshCw,
   LucideIcon,
@@ -9,8 +9,8 @@ import { WHY_CHOOSE_US } from "@/config/marketing";
 import { Card } from "@/components/ui";
 
 const iconMap: Record<string, LucideIcon> = {
-  Leaf,
-  BadgePercent,
+  Store,
+  ShoppingBag,
   Truck,
   RefreshCw,
 };
@@ -26,7 +26,7 @@ export function WhyChooseUs() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {WHY_CHOOSE_US.map((item) => {
-            const Icon = iconMap[item.icon] || Leaf;
+            const Icon = iconMap[item.icon] || Store;
             return (
               <Card key={item.id} hover className="text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 mx-auto mb-4">

@@ -1,23 +1,23 @@
 export const WHY_CHOOSE_US = [
   {
     id: "1",
-    title: "Hàng tươi mỗi ngày",
+    title: "Siêu thị mini quê",
     description:
-      "Nhập hàng tươi mỗi sáng từ nông trại và chợ đầu mối địa phương",
-    icon: "Leaf",
+      "Đầy đủ đồ ăn uống, gia vị, bánh kẹo đến đồ gia dụng — ghé quầy hoặc đặt online",
+    icon: "Store",
   },
   {
     id: "2",
-    title: "Giá tốt",
+    title: "Online & tại quầy",
     description:
-      "Cam kết giá cạnh tranh, nhiều ưu đãi cho khách hàng thân thiết",
-    icon: "BadgePercent",
+      "Đặt trên web giao tận nhà, hoặc đến cửa hàng chọn hàng thanh toán ngay",
+    icon: "ShoppingBag",
   },
   {
     id: "3",
-    title: "Giao nhanh",
+    title: "Giao nhanh gần nhà",
     description:
-      "Giao hàng trong 2 giờ cho khu vực nội thị, 4 giờ cho vùng ven",
+      "Giao nội thị khoảng 2 giờ, vùng ven 3–4 giờ trong giờ mở cửa",
     icon: "Truck",
   },
   {
@@ -35,11 +35,11 @@ export const POLICY_PAGES = {
     sections: [
       {
         heading: "Điều kiện đổi trả",
-        body: "Sản phẩm còn nguyên bao bì, chưa sử dụng (trừ hàng tươi sống bị hỏng do vận chuyển). Thời hạn đổi/trả trong 24 giờ kể từ khi nhận hàng.",
+        body: "Sản phẩm còn nguyên bao bì, chưa sử dụng (trừ hàng tươi sống bị hỏng do vận chuyển). Thời hạn đổi/trả trong 24 giờ kể từ khi nhận hàng hoặc mua tại quầy.",
       },
       {
         heading: "Quy trình",
-        body: "Liên hệ hotline hoặc Zalo, gửi ảnh sản phẩm và mã đơn hàng. Shop xác nhận và hỗ trợ đổi mới hoặc hoàn tiền trong 3–5 ngày làm việc.",
+        body: "Liên hệ hotline hoặc Zalo, gửi ảnh sản phẩm và mã đơn / hóa đơn. Shop xác nhận và hỗ trợ đổi mới hoặc hoàn tiền trong 3–5 ngày làm việc.",
       },
       {
         heading: "Không áp dụng",
@@ -53,15 +53,15 @@ export const POLICY_PAGES = {
     sections: [
       {
         heading: "Khu vực",
-        body: "Giao nội thị Củ Chi và vùng lân cận (Long An, Bình Dương). Ngoài khu vực vui lòng liên hệ shop để tư vấn.",
+        body: "Giao nội thị Gia Viễn (Ninh Bình) và vùng lân cận. Ngoài khu vực vui lòng liên hệ shop để tư vấn. Khách cũng có thể đến lấy tại quầy.",
       },
       {
         heading: "Thời gian & phí",
-        body: "Nội thị khoảng 2 giờ, vùng ven khoảng 4 giờ trong giờ mở cửa. Phí ship 15.000đ; miễn phí với đơn từ 200.000đ.",
+        body: "Nội thị khoảng 2 giờ, vùng ven khoảng 3–4 giờ trong giờ mở cửa. Phí ship 15.000đ; miễn phí với đơn từ 200.000đ. Đến lấy tại cửa hàng: không tính ship.",
       },
       {
         heading: "Nhận hàng",
-        body: "Kiểm tra hàng trước khi thanh toán COD. Nếu thiếu/hỏng, từ chối nhận và báo ngay cho shipper/shop.",
+        body: "Kiểm tra hàng trước khi thanh toán COD hoặc khi nhận tại quầy. Nếu thiếu/hỏng, từ chối nhận và báo ngay cho shop.",
       },
     ],
   },
@@ -78,8 +78,8 @@ export const POLICY_PAGES = {
         body: "Thông tin chỉ dùng cho mục đích bán hàng và chăm sóc. Không bán dữ liệu cho bên thứ ba. Mật khẩu được mã hóa.",
       },
       {
-        heading: "Quyền của bạn",
-        body: "Bạn có thể yêu cầu xem/sửa/xóa thông tin cá nhân qua trang Tài khoản hoặc hotline cửa hàng.",
+        heading: "Liên hệ",
+        body: "Mọi thắc mắc về bảo mật vui lòng gọi hotline cửa hàng hoặc gửi email theo thông tin trên trang Liên hệ.",
       },
     ],
   },
@@ -89,15 +89,11 @@ export const POLICY_PAGES = {
     sections: [
       {
         heading: "Chấp nhận điều khoản",
-        body: "Khi sử dụng website Tạp Hóa FPT, bạn đồng ý với các điều khoản và chính sách liên quan.",
+        body: "Khi sử dụng website và dịch vụ của Tạp Hóa FPT, bạn đồng ý với các điều khoản mua bán, giao nhận và thanh toán được nêu trên website.",
       },
       {
-        heading: "Tài khoản",
-        body: "Bạn chịu trách nhiệm bảo mật tài khoản. Không sử dụng dịch vụ cho mục đích gian lận hoặc trái pháp luật.",
-      },
-      {
-        heading: "Giá & đơn hàng",
-        body: "Giá có thể thay đổi theo thời điểm. Đơn hàng có hiệu lực sau khi shop xác nhận. Shop có quyền từ chối đơn bất thường.",
+        heading: "Đặt hàng & giá",
+        body: "Giá và tồn kho trên web có thể thay đổi theo ngày. Đơn hàng chỉ được xác nhận khi shop xác nhận hoặc khách thanh toán thành công.",
       },
     ],
   },

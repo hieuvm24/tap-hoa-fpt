@@ -6,6 +6,16 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "taphoa-fpt-dev-secret"
 );
 
+/** Chỉ chủ cửa hàng */
+const OWNER_ONLY_PREFIXES = [
+  "/admin/bao-cao",
+  "/admin/cai-dat",
+  "/admin/voucher",
+  "/admin/khuyen-mai",
+  "/admin/tin-tuc",
+  "/admin/danh-muc",
+];
+
 async function getPayload(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -26,6 +36,15 @@ export async function middleware(req: NextRequest) {
       const url = req.nextUrl.clone();
       url.pathname = "/dang-nhap";
       url.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(url);
+    }
+
+    const needsOwner = OWNER_ONLY_PREFIXES.some(
+      (p) => pathname === p || pathname.startsWith(p + "/")
+    );
+    if (needsOwner && session.role !== "OWNER") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/admin";
       return NextResponse.redirect(url);
     }
   }
