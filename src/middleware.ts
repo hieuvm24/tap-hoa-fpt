@@ -16,6 +16,15 @@ const OWNER_ONLY_PREFIXES = [
   "/admin/danh-muc",
 ];
 
+/** Khách phải đăng nhập mới dùng được */
+const AUTH_REQUIRED_PREFIXES = [
+  "/tai-khoan",
+  "/yeu-thich",
+  "/gio-hang",
+  "/thanh-toan",
+  "/don-hang",
+];
+
 async function getPayload(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -49,18 +58,37 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/tai-khoan") || pathname.startsWith("/yeu-thich")) {
-    if (!session) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/dang-nhap";
-      url.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(url);
-    }
+  // Tra cứu đơn bằng mã + SĐT không cần đăng nhập
+  const guestOrderLookup =
+    (pathname === "/don-hang" || pathname.startsWith("/don-hang/")) &&
+    req.nextUrl.searchParams.get("code") &&
+    req.nextUrl.searchParams.get("phone");
+
+  const needsAuth =
+    !guestOrderLookup &&
+    AUTH_REQUIRED_PREFIXES.some(
+      (p) => pathname === p || pathname.startsWith(p + "/")
+    );
+  if (needsAuth && !session) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/dang-nhap";
+    url.searchParams.set("redirect", pathname + (req.nextUrl.search || ""));
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/tai-khoan/:path*", "/yeu-thich/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/tai-khoan/:path*",
+    "/yeu-thich/:path*",
+    "/gio-hang",
+    "/gio-hang/:path*",
+    "/thanh-toan",
+    "/thanh-toan/:path*",
+    "/don-hang",
+    "/don-hang/:path*",
+  ],
 };

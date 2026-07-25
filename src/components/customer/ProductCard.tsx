@@ -7,10 +7,9 @@ import { Product } from "@/types";
 import { formatPrice, calculateDiscount, cn } from "@/lib/utils";
 import { Card, Button, StarRating, Badge } from "@/components/ui";
 import { useCart } from "@/context/CartContext";
-import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRequireLogin } from "@/hooks/useRequireLogin";
 
 interface ProductCardProps {
   product: Product;
@@ -19,22 +18,20 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const discount = calculateDiscount(product.price, product.originalPrice);
   const { addItem } = useCart();
-  const { isAuthenticated } = useAuth();
-  const router = useRouter();
+  const requireLogin = useRequireLogin();
   const [liked, setLiked] = useState(false);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (!requireLogin(`/san-pham/${product.slug}`)) return;
     addItem(product);
   };
 
   const toggleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isAuthenticated) {
-      router.push("/dang-nhap?redirect=/yeu-thich");
-      return;
-    }
+    if (!requireLogin(`/san-pham/${product.slug}`)) return;
     const next = !liked;
     setLiked(next);
     const res = next

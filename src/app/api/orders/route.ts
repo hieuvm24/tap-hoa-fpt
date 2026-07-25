@@ -75,6 +75,9 @@ export async function POST(req: NextRequest) {
   if (isWalkIn && (!session || !isAdminRole(session.role))) {
     return apiError("Chỉ nhân viên / chủ cửa hàng được bán tại quầy", 403);
   }
+  if (!isWalkIn && !session) {
+    return apiError("Vui lòng đăng nhập để đặt hàng", 401);
+  }
 
   const fulfillmentType =
     isWalkIn || rawFulfillment === "pickup" ? "pickup" : "delivery";

@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CreditCard, Banknote, LogIn, QrCode, Truck, Store } from "lucide-react";
+import { CreditCard, Banknote, QrCode, Truck, Store } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import { Button, Card, Input, Textarea } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
@@ -173,19 +173,6 @@ function CheckoutContent() {
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Thanh toán</h1>
-      {!isAuthenticated && (
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
-          <p className="text-sm text-primary-800">
-            <LogIn className="inline h-4 w-4 mr-1" />
-            Đăng nhập để lưu địa chỉ và xem lịch sử đơn. Khách vãng lai vẫn đặt được — tra cứu bằng mã đơn + SĐT.
-          </p>
-          <Link href="/dang-nhap?redirect=/thanh-toan">
-            <Button size="sm" variant="outline">
-              Đăng nhập
-            </Button>
-          </Link>
-        </div>
-      )}
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">

@@ -8,5 +8,6 @@ export { PromotionCarousel } from "./PromotionCarousel";
 export { WhyChooseUs } from "./WhyChooseUs";
 export { ReviewSlider } from "./ReviewSlider";
 export { ProductRecommendations } from "./ProductRecommendations";
+export { SearchBox } from "./SearchBox";
 export { ChatBot } from "./ChatBot";
 export { UserMenu } from "./UserMenu";

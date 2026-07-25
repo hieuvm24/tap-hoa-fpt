@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
-  Search,
   ShoppingCart,
   User,
   Menu,
@@ -17,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { UserMenu } from "./UserMenu";
+import { SearchBox } from "./SearchBox";
 import { api } from "@/lib/api";
 
 const navLinks = [
@@ -30,25 +29,15 @@ const navLinks = [
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [storeName, setStoreName] = useState("Tạp Hóa FPT");
   const { isAuthenticated, user, logout, isLoading } = useAuth();
   const { itemCount } = useCart();
-  const router = useRouter();
 
   useEffect(() => {
     api.store.get().then((res) => {
       if (res.success && res.data) setStoreName(res.data.name);
     });
   }, []);
-
-  const handleSearch = (e: FormEvent) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (!q) return;
-    router.push(`/danh-muc?search=${encodeURIComponent(q)}`);
-    setIsMenuOpen(false);
-  };
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
@@ -76,26 +65,18 @@ export function Navbar() {
             ))}
           </nav>
 
-          <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                type="search"
-                placeholder="Tìm sản phẩm..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-10 pr-4 text-sm transition-all focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-              />
-            </div>
-          </form>
+          <div className="hidden md:block flex-1 max-w-md">
+            <SearchBox />
+          </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
             <Link
-              href="/gio-hang"
+              href={isAuthenticated ? "/gio-hang" : "/dang-nhap?redirect=/gio-hang"}
               className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-primary-50 hover:text-primary-600"
+              title={isAuthenticated ? "Giỏ hàng" : "Đăng nhập để xem giỏ hàng"}
             >
               <ShoppingCart className="h-5 w-5" />
-              {itemCount > 0 && (
+              {isAuthenticated && itemCount > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary-500 text-[10px] font-bold text-white">
                   {itemCount}
                 </span>
@@ -124,18 +105,9 @@ export function Navbar() {
           </div>
         </div>
 
-        <form onSubmit={handleSearch} className="md:hidden pb-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="search"
-              placeholder="Tìm sản phẩm..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-10 pr-4 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-            />
-          </div>
-        </form>
+        <div className="md:hidden pb-3">
+          <SearchBox onSearched={() => setIsMenuOpen(false)} />
+        </div>
       </div>
 
       <div

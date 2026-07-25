@@ -12,6 +12,7 @@ import { ProductRecommendations } from "@/components/customer";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { Product, Review } from "@/types";
 
 function ProductDetailContent({ slug }: { slug: string }) {
@@ -25,6 +26,7 @@ function ProductDetailContent({ slug }: { slug: string }) {
   const [submittingReview, setSubmittingReview] = useState(false);
   const { addItem } = useCart();
   const { isAuthenticated } = useAuth();
+  const requireLogin = useRequireLogin();
   const router = useRouter();
 
   useEffect(() => {
@@ -60,19 +62,18 @@ function ProductDetailContent({ slug }: { slug: string }) {
   const discount = calculateDiscount(product.price, product.originalPrice);
 
   const handleAddToCart = () => {
+    if (!requireLogin(`/san-pham/${slug}`)) return;
     addItem(product, quantity);
   };
 
   const handleBuyNow = () => {
+    if (!requireLogin(`/san-pham/${slug}`)) return;
     addItem(product, quantity);
     router.push("/thanh-toan");
   };
 
   const handleSubmitReview = async () => {
-    if (!isAuthenticated) {
-      router.push(`/dang-nhap?redirect=/san-pham/${slug}`);
-      return;
-    }
+    if (!requireLogin(`/san-pham/${slug}`)) return;
     setSubmittingReview(true);
     const res = await api.reviews.create({
       productId: product.id,
@@ -247,8 +248,9 @@ function ProductDetailContent({ slug }: { slug: string }) {
       </div>
 
       <div className="mx-auto max-w-7xl border-t border-gray-100">
-        <ProductRecommendations product={product} variant="bought-together" limit={3} />
-        <ProductRecommendations product={product} variant="similar" />
+        <ProductRecommendations product={product} variant="bought-together" limit={4} />
+        <ProductRecommendations product={product} variant="similar" limit={4} />
+        <ProductRecommendations product={product} variant="recent" limit={4} />
       </div>
     </div>
   );

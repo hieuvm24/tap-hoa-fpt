@@ -157,7 +157,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ code, subtotal }),
       }),
-    list: () =>
+    list: (activeOnly = false) =>
       request<
         {
           id: string;
@@ -166,7 +166,7 @@ export const api = {
           minOrder: number;
           isActive: boolean;
         }[]
-      >("/vouchers"),
+      >(`/vouchers${activeOnly ? "?active=true" : ""}`),
     create: (data: Record<string, unknown>) =>
       request("/vouchers", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: Record<string, unknown>) =>

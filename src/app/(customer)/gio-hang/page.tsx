@@ -1,19 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Minus, Plus, Trash2, ShoppingBag, Tag } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { Button, Card, Input } from "@/components/ui";
 import { useCart } from "@/context/CartContext";
 import { api } from "@/lib/api";
 import { FREE_SHIP_THRESHOLD, SHIPPING_FEE } from "@/config/defaults";
+import { ProductRecommendations } from "@/components/customer";
 
-export default function CartPage() {
+function CartPageContent() {
+  const searchParams = useSearchParams();
+  const voucherFromUrl = searchParams.get("voucher") || "";
   const { items, updateQuantity, removeItem, subtotal } = useCart();
-  const [voucher, setVoucher] = useState("");
+  const [voucher, setVoucher] = useState(voucherFromUrl);
   const [appliedVoucher, setAppliedVoucher] = useState("");
   const [discount, setDiscount] = useState(0);
   const [voucherError, setVoucherError] = useState("");
@@ -21,12 +24,13 @@ export default function CartPage() {
   const shippingFee = subtotal >= FREE_SHIP_THRESHOLD ? 0 : SHIPPING_FEE;
   const total = subtotal + shippingFee - discount;
 
-  const applyVoucher = async () => {
-    if (!voucher.trim()) return;
-    const res = await api.vouchers.validate(voucher, subtotal);
+  const applyVoucher = async (code = voucher) => {
+    if (!code.trim()) return;
+    const res = await api.vouchers.validate(code, subtotal);
     if (res.success && res.data) {
       setDiscount(res.data.discount);
       setAppliedVoucher(res.data.code);
+      setVoucher(res.data.code);
       setVoucherError("");
     } else {
       setDiscount(0);
@@ -35,17 +39,29 @@ export default function CartPage() {
     }
   };
 
+  useEffect(() => {
+    if (voucherFromUrl) {
+      setVoucher(voucherFromUrl);
+      if (subtotal > 0) void applyVoucher(voucherFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voucherFromUrl, subtotal]);
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Giỏ hàng</h1>
 
       {items.length === 0 ? (
-        <div className="text-center py-16">
-          <ShoppingBag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 mb-4">Giỏ hàng trống</p>
-          <Link href="/danh-muc">
-            <Button>Tiếp tục mua sắm</Button>
-          </Link>
+        <div>
+          <div className="text-center py-12">
+            <ShoppingBag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 mb-4">Giỏ hàng trống</p>
+            <Link href="/danh-muc">
+              <Button>Tiếp tục mua sắm</Button>
+            </Link>
+          </div>
+          <ProductRecommendations variant="bestsellers" limit={4} />
+          <ProductRecommendations variant="personalized" limit={4} />
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -122,7 +138,12 @@ export default function CartPage() {
                   onChange={(e) => setVoucher(e.target.value)}
                   icon={<Tag className="h-4 w-4" />}
                 />
-                <Button variant="outline" size="sm" className="flex-shrink-0" onClick={applyVoucher}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0"
+                  onClick={() => applyVoucher()}
+                >
                   Áp dụng
                 </Button>
               </div>
@@ -145,6 +166,24 @@ export default function CartPage() {
           </div>
         </div>
       )}
+
+      {items.length > 0 && (
+        <div className="mt-12 border-t border-gray-100 pt-4">
+          <ProductRecommendations
+            variant="cart"
+            cartProductIds={items.map((i) => i.productId)}
+            limit={4}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function CartPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Đang tải...</div>}>
+      <CartPageContent />
+    </Suspense>
   );
 }

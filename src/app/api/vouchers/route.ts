@@ -27,8 +27,20 @@ function mapVoucher(v: {
   };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getSession();
+  const { searchParams } = new URL(req.url);
+  const publicActive = searchParams.get("active") === "true";
+
+  // Khách xem mã ?ang m?; admin xem toàn b?
+  if (publicActive) {
+    const vouchers = await prisma.voucher.findMany({
+      where: { isActive: true },
+      orderBy: { code: "asc" },
+    });
+    return apiSuccess(vouchers.map(mapVoucher));
+  }
+
   if (!session || !isOwnerRole(session.role)) {
     return apiError("Forbidden", 403);
   }
