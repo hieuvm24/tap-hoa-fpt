@@ -360,6 +360,54 @@ export const api = {
 
   customers: {
     list: () => request<import("@/types").Customer[]>("/customers"),
+    get: (id: string) =>
+      request<
+        import("@/types").Customer & {
+          addresses: {
+            id: string;
+            label: string;
+            fullName: string;
+            phone: string;
+            address: string;
+            isDefault: boolean;
+          }[];
+          recentOrders: import("@/types").Order[];
+        }
+      >(`/customers/${id}`),
+    update: (
+      id: string,
+      data: { name: string; phone?: string; email: string }
+    ) =>
+      request<import("@/types").Customer>(`/customers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  adminSearch: {
+    query: (q: string) =>
+      request<{
+        products: {
+          id: string;
+          name: string;
+          slug: string;
+          price: number;
+          image: string;
+        }[];
+        customers: {
+          id: string;
+          name: string;
+          email: string;
+          phone: string | null;
+        }[];
+        orders: {
+          id: string;
+          orderCode: string;
+          customerName: string;
+          total: number;
+          status: string;
+        }[];
+      }>(`/admin/search?q=${encodeURIComponent(q)}`),
   },
 
   dashboard: {
