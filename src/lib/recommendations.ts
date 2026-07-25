@@ -1,4 +1,5 @@
 import { Product } from "@/types";
+import { normalizeVi } from "@/lib/normalize-vi";
 
 /** Danh mục thường mua kèm nhau (tạp hóa / siêu thị mini) */
 export const CATEGORY_PAIRS: Record<string, string[]> = {
@@ -202,17 +203,16 @@ export function searchProductsByKeyword(
   products: Product[],
   limit = 3
 ): Product[] {
-  const q = keyword.toLowerCase().trim();
+  const q = normalizeVi(keyword);
   if (!q) return [];
   return products
-    .filter(
-      (p) =>
-        p.status === "active" &&
-        (p.name.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          p.categorySlug.replace(/-/g, " ").includes(q))
-    )
+    .filter((p) => {
+      if (p.status !== "active") return false;
+      const hay = normalizeVi(
+        `${p.name} ${p.category} ${p.brand} ${p.categorySlug.replace(/-/g, " ")}`
+      );
+      return hay.includes(q);
+    })
     .sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0) || b.rating - a.rating)
     .slice(0, limit);
 }

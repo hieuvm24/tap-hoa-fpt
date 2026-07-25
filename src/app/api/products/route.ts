@@ -2,13 +2,17 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession, isAdminRole } from "@/lib/auth-server";
 import { mapProduct, mapCategory, apiSuccess, apiError } from "@/lib/mappers";
+import { normalizeVi, slugifyVi } from "@/lib/normalize-vi";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category");
   const featured = searchParams.get("featured");
-  const search = searchParams.get("search");
+  const search =
+    searchParams.get("search")?.trim() ||
+    searchParams.get("q")?.trim() ||
+    "";
   const brand = searchParams.get("brand");
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
@@ -36,17 +40,42 @@ export async function GET(req: NextRequest) {
   }
   if (search) {
     const isPostgres = (process.env.DATABASE_URL || "").startsWith("postgres");
+    const mode = isPostgres ? ({ mode: "insensitive" as const }) : {};
+    const nq = normalizeVi(search);
+    const slugQ = slugifyVi(search);
+
+    // Tim "rau cu" / "Rau củ" → ca danh muc rau-cu (khong chi ten SP)
+    const categories = await prisma.category.findMany({
+      select: { id: true, name: true, slug: true },
+    });
+    const matchedCatIds = categories
+      .filter((c) => {
+        const nn = normalizeVi(c.name);
+        const ns = normalizeVi(c.slug.replace(/-/g, " "));
+        return (
+          nn === nq ||
+          nn.includes(nq) ||
+          nq.includes(nn) ||
+          ns === nq ||
+          c.slug === slugQ ||
+          c.slug.includes(slugQ) ||
+          slugQ.includes(c.slug)
+        );
+      })
+      .map((c) => c.id);
+
     where.OR = [
+      { name: { contains: search, ...mode } },
+      { brand: { contains: search, ...mode } },
+      ...(matchedCatIds.length
+        ? [{ categoryId: { in: matchedCatIds } }]
+        : []),
       {
-        name: {
-          contains: search,
-          ...(isPostgres ? { mode: "insensitive" as const } : {}),
-        },
-      },
-      {
-        brand: {
-          contains: search,
-          ...(isPostgres ? { mode: "insensitive" as const } : {}),
+        category: {
+          OR: [
+            { name: { contains: search, ...mode } },
+            { slug: { contains: slugQ, ...mode } },
+          ],
         },
       },
     ];

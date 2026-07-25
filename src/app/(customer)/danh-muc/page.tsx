@@ -25,6 +25,7 @@ import { Button, ProductCardSkeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { addSearchHistory } from "@/lib/search-history";
+import { normalizeVi } from "@/lib/normalize-vi";
 import { Product, Category } from "@/types";
 
 type SortOption = "newest" | "price-asc" | "price-desc";
@@ -138,11 +139,11 @@ function CategoryPageContent() {
     );
     const q = keyword.trim().toLowerCase();
     if (q && q !== searchQuery.toLowerCase()) {
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q)
-      );
+      const nq = normalizeVi(q);
+      result = result.filter((p) => {
+        const hay = normalizeVi(`${p.name} ${p.brand} ${p.category}`);
+        return hay.includes(nq) || p.name.toLowerCase().includes(q);
+      });
     }
     if (onlyPromo) result = result.filter((p) => p.isPromotion);
     if (inStockOnly) result = result.filter((p) => p.stock > 0);

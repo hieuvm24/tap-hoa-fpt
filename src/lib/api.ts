@@ -230,6 +230,65 @@ export const api = {
       }),
   },
 
+  support: {
+    myThread: () =>
+      request<{
+        id: string;
+        status: string;
+        messages: {
+          id: string;
+          senderRole: "customer" | "staff";
+          senderName: string;
+          content: string;
+          createdAt: string;
+        }[];
+      }>("/support/threads"),
+    listThreads: () =>
+      request<
+        {
+          id: string;
+          status: string;
+          lastMessageAt: string;
+          unread: number;
+          preview?: string;
+          customer?: {
+            id: string;
+            name: string;
+            email: string;
+            phone?: string;
+          };
+        }[]
+      >("/support/threads"),
+    getThread: (id: string) =>
+      request<{
+        id: string;
+        status: string;
+        customer?: {
+          id: string;
+          name: string;
+          email: string;
+          phone?: string;
+        };
+        messages: {
+          id: string;
+          senderRole: "customer" | "staff";
+          senderName: string;
+          content: string;
+          createdAt: string;
+        }[];
+      }>(`/support/threads/${id}`),
+    send: (content: string) =>
+      request("/support/threads", {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      }),
+    reply: (threadId: string, content: string) =>
+      request(`/support/threads/${threadId}`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      }),
+  },
+
   payments: {
     createVnpay: (data: { orderId?: string; orderCode?: string }) =>
       request<{

@@ -21,6 +21,7 @@ model User {
   addresses    Address[]
   wishlist     WishlistItem[]
   resetTokens  PasswordResetToken[]
+  supportThreads SupportThread[]
 }
 
 model PasswordResetToken {
@@ -201,4 +202,33 @@ model News {
   image       String
   publishedAt DateTime @default(now())
   isPublished Boolean  @default(true)
+}
+
+/// Chat truc tiep khach <-> nhan vien
+model SupportThread {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        String           @default("open")
+  lastMessageAt DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+  messages      SupportMessage[]
+
+  @@index([userId])
+  @@index([lastMessageAt])
+}
+
+model SupportMessage {
+  id         String        @id @default(cuid())
+  threadId   String
+  thread     SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  /// customer | staff
+  senderRole String
+  senderId   String?
+  senderName String
+  content    String
+  createdAt  DateTime      @default(now())
+  readAt     DateTime?
+
+  @@index([threadId, createdAt])
 }

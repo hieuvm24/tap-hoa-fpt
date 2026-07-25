@@ -16,6 +16,7 @@ import {
   Store,
   X,
   HandCoins,
+  MessagesSquare,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const iconByHref: Record<string, LucideIcon> = {
   "/admin/don-hang": ShoppingBag,
   "/admin/ban-tai-quay": HandCoins,
   "/admin/khach-hang": Users,
+  "/admin/tin-nhan": MessagesSquare,
   "/admin/khuyen-mai": Tag,
   "/admin/voucher": Ticket,
   "/admin/tin-tuc": Newspaper,

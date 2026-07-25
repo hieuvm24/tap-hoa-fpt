@@ -1,6 +1,7 @@
 import { formatPrice } from "@/lib/utils";
 import { searchProductsByKeyword } from "@/lib/recommendations";
 import { FREE_SHIP_THRESHOLD, SHIPPING_FEE } from "@/config/defaults";
+import { normalizeVi } from "@/lib/normalize-vi";
 import type { Product } from "@/types";
 
 export interface AiChatContext {
@@ -57,21 +58,11 @@ const STOP_WORDS = new Set([
   "the",
   "nao",
   "o",
+  "dau",
   "tai",
   "cua",
   "hang",
 ]);
-
-function normalizeVi(s: string) {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[?!.,;:]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function cleanKeyword(raw: string) {
   return normalizeVi(raw)
@@ -234,10 +225,19 @@ function detectIntent(raw: string, normalized: string): Intent {
   if (/(khuyen mai|voucher|giam gia|ma giam|uu dai)/i.test(raw)) {
     return "promo";
   }
-  if (/(lien he|hotline|zalo|so dien thoai|sdt)\b/i.test(raw)) {
+  if (
+    /(lien he|hotline|zalo|so dien thoai|sdt)\b/i.test(normalized) ||
+    /(liên hệ|số điện thoại)/i.test(raw)
+  ) {
     return "contact";
   }
-  if (/(ban do|chi duong|o dau|dia chi|map)/i.test(raw)) {
+  // Quan trong: dung chuoi da bo dau ("shop o dau") — raw "ở đâu" khong match /o dau/
+  if (
+    /\b(o dau|dia chi|ban do|chi duong|map|vi tri|dia diem)\b/i.test(
+      normalized
+    ) ||
+    /(ở đâu|địa chỉ|bản đồ|chỉ đường|vị trí)/i.test(raw)
+  ) {
     return "location";
   }
   if (/(dat hang|mua the nao|cach mua|huong dan dat|order)/i.test(raw)) {
@@ -269,10 +269,16 @@ function detectIntent(raw: string, normalized: string): Intent {
     return "featured";
   }
   if (
-    /(gia|bao nhieu|con khong|con hang|co ban|co\s|tim|mua|can|xem)\b/i.test(
-      raw
-    ) ||
-    raw.length <= 40
+    /\b(gia|bao nhieu|con khong|con hang|co ban|tim|mua|can|xem)\b/i.test(
+      normalized
+    )
+  ) {
+    return "product";
+  }
+  // Cau ngan chi coi la tim SP khi co tu khoa hang — tranh "shop o dau?" → product
+  if (
+    raw.length <= 40 &&
+    !/\b(o dau|dia chi|giup|hoi|the nao|sao|ai|khi nao)\b/i.test(normalized)
   ) {
     return "product";
   }

@@ -8,6 +8,7 @@ export type AdminPermission =
   | "orders"
   | "pos"
   | "customers"
+  | "support"
   | "promotions"
   | "vouchers"
   | "news"
@@ -20,6 +21,7 @@ const STAFF_PERMISSIONS: AdminPermission[] = [
   "orders",
   "pos",
   "customers",
+  "support",
 ];
 
 const OWNER_PERMISSIONS: AdminPermission[] = [
@@ -67,6 +69,7 @@ export function canAccessAdminPath(
     "/admin/don-hang",
     "/admin/ban-tai-quay",
     "/admin/khach-hang",
+    "/admin/tin-nhan",
   ];
   if (pathname === "/admin") return true;
   return staffPaths.some(
@@ -86,6 +89,7 @@ export const ADMIN_MENU: {
   { href: "/admin/don-hang", label: "Đơn hàng", permission: "orders" },
   { href: "/admin/ban-tai-quay", label: "Bán tại quầy", permission: "pos" },
   { href: "/admin/khach-hang", label: "Khách hàng", permission: "customers" },
+  { href: "/admin/tin-nhan", label: "Tin nhắn", permission: "support" },
   { href: "/admin/khuyen-mai", label: "Khuyến mãi", permission: "promotions" },
   { href: "/admin/voucher", label: "Voucher", permission: "vouchers" },
   { href: "/admin/tin-tuc", label: "Tin tức", permission: "news" },
