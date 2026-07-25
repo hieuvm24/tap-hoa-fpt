@@ -4,20 +4,20 @@ import bcrypt from "bcryptjs";
 import type { UserRole } from "@/types/auth";
 import { prisma } from "@/lib/db";
 
-function resolveJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("JWT_SECRET is required in production");
-    }
-    return new TextEncoder().encode("taphoa-fpt-dev-secret");
-  }
-  return new TextEncoder().encode(secret);
-}
-
-const JWT_SECRET = resolveJwtSecret();
 const COOKIE_NAME = "taphoa_token";
 const TOKEN_EXPIRY = "7d";
+const DEV_FALLBACK = "taphoa-fpt-dev-secret";
+
+/**
+ * Lazy secret — khong throw luc import (Next collect page data se crash build).
+ * Production thieu JWT_SECRET: createToken loi ro; verifyToken fail-closed.
+ */
+function getJwtSecret(): Uint8Array | null {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (secret) return new TextEncoder().encode(secret);
+  if (process.env.NODE_ENV === "production") return null;
+  return new TextEncoder().encode(DEV_FALLBACK);
+}
 
 export interface SessionPayload {
   userId: string;
@@ -37,16 +37,24 @@ export async function verifyPassword(
 }
 
 export async function createToken(payload: SessionPayload): Promise<string> {
+  const secret = getJwtSecret();
+  if (!secret) {
+    throw new Error(
+      "JWT_SECRET is required in production. Set it in Vercel → Settings → Environment Variables."
+    );
+  }
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(TOKEN_EXPIRY)
-    .sign(JWT_SECRET);
+    .sign(secret);
 }
 
 export async function verifyToken(token: string): Promise<SessionPayload | null> {
+  const secret = getJwtSecret();
+  if (!secret) return null;
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, secret);
     return payload as unknown as SessionPayload;
   } catch {
     return null;
