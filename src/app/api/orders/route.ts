@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const session = await getSession();
   const { searchParams } = new URL(req.url);
   const mine = searchParams.get("mine");
+  const status = searchParams.get("status");
+  const limitRaw = Number(searchParams.get("limit") || 0);
 
   const where: Record<string, unknown> = {};
 
@@ -23,10 +25,13 @@ export async function GET(req: NextRequest) {
     where.userId = session.userId;
   }
 
+  if (status) where.status = status;
+
   const orders = await prisma.order.findMany({
     where,
     include: orderInclude,
     orderBy: { createdAt: "desc" },
+    ...(limitRaw > 0 ? { take: Math.min(limitRaw, 50) } : {}),
   });
 
   return apiSuccess(orders.map(mapOrder));
