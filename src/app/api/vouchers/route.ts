@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const publicActive = searchParams.get("active") === "true";
 
-  // Khách xem mã ?ang m?; admin xem toàn b?
+  // Public: active vouchers only. Admin: full list.
   if (publicActive) {
     const vouchers = await prisma.voucher.findMany({
       where: { isActive: true },
