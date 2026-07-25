@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { resolveJwtSecretString } from "@/lib/jwt-secret";
 
 const COOKIE_NAME = "taphoa_token";
-const JWT_SECRET_RAW =
-  process.env.JWT_SECRET ||
-  (process.env.NODE_ENV === "production" ? "" : "taphoa-fpt-dev-secret");
-const JWT_SECRET = JWT_SECRET_RAW
-  ? new TextEncoder().encode(JWT_SECRET_RAW)
-  : null;
+const JWT_SECRET = new TextEncoder().encode(resolveJwtSecretString());
 
 /** Chỉ chủ cửa hàng */
 const OWNER_ONLY_PREFIXES = [
@@ -29,7 +25,6 @@ const AUTH_REQUIRED_PREFIXES = [
 ];
 
 async function getPayload(req: NextRequest) {
-  if (!JWT_SECRET) return null; // production thieu JWT_SECRET → fail-closed
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
   try {
