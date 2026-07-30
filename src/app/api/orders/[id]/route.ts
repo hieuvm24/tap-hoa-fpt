@@ -169,6 +169,37 @@ export async function PATCH(
   const fulfillmentType = (existing as { fulfillmentType?: string })
     .fulfillmentType;
 
+  if (!status && !nextPayment) {
+    return apiError("Cần truyền status hoặc paymentStatus");
+  }
+
+  // Chỉ xác nhận thu tiền (COD / CK) — không đổi trạng thái đơn
+  if (!status && nextPayment) {
+    if (nextPayment !== "paid" && nextPayment !== "pending" && nextPayment !== "failed") {
+      return apiError("Trạng thái thanh toán không hợp lệ");
+    }
+    const order = await prisma.order.update({
+      where: { id },
+      data: {
+        paymentStatus: nextPayment,
+        timeline: {
+          create: {
+            status: existing.status,
+            note:
+              note ||
+              (nextPayment === "paid"
+                ? existing.paymentMethod === "transfer"
+                  ? "Đã xác nhận chuyển khoản"
+                  : "Đã thu tiền COD"
+                : `Cập nhật thanh toán: ${nextPayment}`),
+          },
+        },
+      },
+      include: orderInclude,
+    });
+    return apiSuccess(mapOrder(order));
+  }
+
   const order = await prisma.order.update({
     where: { id },
     data: {

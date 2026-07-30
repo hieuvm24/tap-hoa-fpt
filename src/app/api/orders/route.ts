@@ -75,6 +75,34 @@ export async function GET(req: NextRequest) {
     where.createdAt = createdAt;
   }
 
+  const pageRaw = Number(searchParams.get("page") || 0);
+  const paginate = pageRaw > 0 || searchParams.get("paginate") === "true";
+  const page = Math.max(1, pageRaw || 1);
+  const pageSize = Math.min(
+    Math.max(limitRaw > 0 ? limitRaw : 20, 1),
+    100
+  );
+
+  if (paginate) {
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: orderInclude,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.order.count({ where }),
+    ]);
+    return apiSuccess({
+      orders: orders.map(mapOrder),
+      total,
+      page,
+      limit: pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    });
+  }
+
   const orders = await prisma.order.findMany({
     where,
     include: orderInclude,

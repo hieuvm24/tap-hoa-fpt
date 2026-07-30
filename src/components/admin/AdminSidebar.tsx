@@ -17,6 +17,8 @@ import {
   X,
   HandCoins,
   MessagesSquare,
+  Star,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,10 +33,12 @@ const iconByHref: Record<string, LucideIcon> = {
   "/admin/ban-tai-quay": HandCoins,
   "/admin/khach-hang": Users,
   "/admin/tin-nhan": MessagesSquare,
+  "/admin/danh-gia": Star,
   "/admin/khuyen-mai": Tag,
   "/admin/voucher": Ticket,
   "/admin/tin-tuc": Newspaper,
   "/admin/bao-cao": BarChart3,
+  "/admin/nhan-vien": UserCog,
   "/admin/cai-dat": Settings,
 };
 

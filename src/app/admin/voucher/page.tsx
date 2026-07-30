@@ -12,6 +12,8 @@ type Voucher = {
   discount: number;
   minOrder: number;
   isActive: boolean;
+  usageCount?: number;
+  revenueImpact?: number;
 };
 
 export default function AdminVouchersPage() {
@@ -94,6 +96,11 @@ export default function AdminVouchersPage() {
               </div>
               <p className="text-sm text-gray-500 mt-1">
                 Giảm {v.discount}% · Đơn tối thiểu {formatPrice(v.minOrder)}
+                {" · "}
+                Đã dùng {v.usageCount ?? 0} lần
+                {(v.revenueImpact ?? 0) > 0
+                  ? ` · Giảm tổng ${formatPrice(v.revenueImpact || 0)}`
+                  : ""}
               </p>
             </div>
             <div className="flex gap-2">

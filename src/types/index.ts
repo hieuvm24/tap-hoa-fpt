@@ -136,11 +136,20 @@ export interface Customer {
 
 export interface DashboardStats {
   todayRevenue: number;
-  totalOrders: number;
-  totalProducts: number;
-  totalCustomers: number;
+  todayOrders: number;
   revenueChange: number;
   ordersChange: number;
+  monthRevenue: number;
+  monthOrders: number;
+  pendingCount: number;
+  toConfirmCount: number;
+  shippingCount: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  todayPickup: number;
+  todayDelivery: number;
+  unpaidCodTotal: number;
+  unpaidCodCount: number;
 }
 
 export interface ChartData {

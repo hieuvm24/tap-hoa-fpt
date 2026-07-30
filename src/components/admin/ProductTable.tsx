@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Image from "next/image";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, PackagePlus, Copy } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { normalizeVi } from "@/lib/normalize-vi";
 import { Button, Badge, Input } from "@/components/ui";
@@ -65,6 +65,32 @@ export function ProductTable() {
     if (!confirm("Xóa sản phẩm này?")) return;
     await api.products.delete(id);
     loadProducts();
+  };
+
+  const handleRestock = async (product: Product) => {
+    const raw = prompt(
+      `Nhập thêm tồn cho "${product.name}" (hiện còn ${product.stock}). Ví dụ: 20`,
+      "20"
+    );
+    if (raw == null) return;
+    const delta = parseInt(raw, 10);
+    if (!Number.isFinite(delta) || delta === 0) {
+      alert("Số lượng không hợp lệ");
+      return;
+    }
+    const res = await api.products.adjustStock(product.id, {
+      delta,
+      reason: "Nhập hàng nhanh",
+    });
+    if (res.success) loadProducts();
+    else alert(res.error || "Cập nhật tồn thất bại");
+  };
+
+  const handleDuplicate = async (product: Product) => {
+    if (!confirm(`Nhân bản "${product.name}"?`)) return;
+    const res = await api.products.duplicate(product.id);
+    if (res.success) loadProducts();
+    else alert(res.error || "Nhân bản thất bại");
   };
 
   const handleSaved = () => {
@@ -161,7 +187,13 @@ export function ProductTable() {
                   <td className="px-4 py-3 font-medium text-primary-600">
                     {formatPrice(product.price)}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">
+                  <td
+                    className={
+                      product.stock <= 10
+                        ? "px-4 py-3 font-semibold text-red-600 hidden sm:table-cell"
+                        : "px-4 py-3 text-gray-600 hidden sm:table-cell"
+                    }
+                  >
                     {product.stock}
                   </td>
                   <td className="px-4 py-3">
@@ -175,6 +207,22 @@ export function ProductTable() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
+                      <button
+                        type="button"
+                        title="Nhập thêm tồn"
+                        onClick={() => handleRestock(product)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                      >
+                        <PackagePlus className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Nhân bản"
+                        onClick={() => handleDuplicate(product)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={() => handleEdit(product)}
                         className="rounded-lg p-1.5 text-gray-400 hover:bg-primary-50 hover:text-primary-600 transition-colors"

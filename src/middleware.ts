@@ -13,6 +13,7 @@ const OWNER_ONLY_PREFIXES = [
   "/admin/khuyen-mai",
   "/admin/tin-tuc",
   "/admin/danh-muc",
+  "/admin/nhan-vien",
 ];
 
 /** Khách phải đăng nhập mới dùng được */

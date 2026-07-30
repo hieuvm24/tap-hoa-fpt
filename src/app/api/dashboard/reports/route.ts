@@ -15,6 +15,13 @@ function endOfDay(d: Date) {
   return x;
 }
 
+function pctChange(current: number, previous: number) {
+  if (previous > 0) {
+    return Math.round(((current - previous) / previous) * 1000) / 10;
+  }
+  return current > 0 ? 100 : 0;
+}
+
 function parseRange(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const now = new Date();
@@ -34,11 +41,14 @@ function parseRange(req: NextRequest) {
   } else if (preset === "year") {
     from = startOfDay(new Date(now.getFullYear(), 0, 1));
   } else {
-    // month
     from = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
   }
 
-  return { from, to, preset };
+  const durationMs = to.getTime() - from.getTime();
+  const prevTo = endOfDay(new Date(from.getTime() - 1));
+  const prevFrom = startOfDay(new Date(prevTo.getTime() - durationMs));
+
+  return { from, to, preset, prevFrom, prevTo };
 }
 
 export async function GET(req: NextRequest) {
@@ -47,27 +57,17 @@ export async function GET(req: NextRequest) {
     return apiError("Chỉ chủ cửa hàng xem báo cáo", 403);
   }
 
-  const { from, to, preset } = parseRange(req);
+  const { from, to, preset, prevFrom, prevTo } = parseRange(req);
   const currentYear = new Date().getFullYear();
   const yearStart = new Date(currentYear, 0, 1);
   const now = new Date();
   const monthsToShow = now.getMonth() + 1;
   const monthLabels = [
-    "T1",
-    "T2",
-    "T3",
-    "T4",
-    "T5",
-    "T6",
-    "T7",
-    "T8",
-    "T9",
-    "T10",
-    "T11",
-    "T12",
+    "T1", "T2", "T3", "T4", "T5", "T6",
+    "T7", "T8", "T9", "T10", "T11", "T12",
   ];
 
-  const [rangeOrders, yearOrders, allInRangeInclCancel, lowStock, categories] =
+  const [rangeOrders, prevOrders, yearOrders, allInRangeInclCancel, lowStock, categories] =
     await Promise.all([
       prisma.order.findMany({
         where: {
@@ -91,10 +91,17 @@ export async function GET(req: NextRequest) {
       }),
       prisma.order.findMany({
         where: {
+          createdAt: { gte: prevFrom, lte: prevTo },
+          status: { not: "cancelled" },
+        },
+        select: { total: true },
+      }),
+      prisma.order.findMany({
+        where: {
           createdAt: { gte: yearStart, lte: now },
           status: { not: "cancelled" },
         },
-        select: { total: true, createdAt: true, userId: true, customerName: true },
+        select: { total: true, createdAt: true },
       }),
       prisma.order.findMany({
         where: { createdAt: { gte: from, lte: to } },
@@ -104,7 +111,7 @@ export async function GET(req: NextRequest) {
         where: { status: "ACTIVE", stock: { lte: 10 } },
         select: { name: true, stock: true, sku: true },
         orderBy: { stock: "asc" },
-        take: 10,
+        take: 12,
       }),
       prisma.category.findMany({
         select: { id: true, name: true, slug: true },
@@ -114,6 +121,9 @@ export async function GET(req: NextRequest) {
   const revenue = rangeOrders.reduce((s, o) => s + o.total, 0);
   const orderCount = rangeOrders.length;
   const avgOrder = orderCount ? Math.round(revenue / orderCount) : 0;
+  const prevRevenue = prevOrders.reduce((s, o) => s + o.total, 0);
+  const prevOrderCount = prevOrders.length;
+
   const cancelledCount = allInRangeInclCancel.filter(
     (o) => o.status === "cancelled"
   ).length;
@@ -123,12 +133,22 @@ export async function GET(req: NextRequest) {
     : 0;
 
   const paidCount = rangeOrders.filter((o) => o.paymentStatus === "paid").length;
-  const pickupCount = rangeOrders.filter(
-    (o) => o.fulfillmentType === "pickup"
-  ).length;
-  const deliveryCount = orderCount - pickupCount;
+  const unpaidOrders = rangeOrders.filter((o) => o.paymentStatus !== "paid");
+  const unpaidCount = unpaidOrders.length;
+  const unpaidAmount = unpaidOrders.reduce((s, o) => s + o.total, 0);
 
-  // Doanh thu theo ngay trong khoang
+  const pickupOrders = rangeOrders.filter((o) => o.fulfillmentType === "pickup");
+  const deliveryOrders = rangeOrders.filter((o) => o.fulfillmentType !== "pickup");
+  const pickupCount = pickupOrders.length;
+  const deliveryCount = deliveryOrders.length;
+  const pickupRevenue = pickupOrders.reduce((s, o) => s + o.total, 0);
+  const deliveryRevenue = deliveryOrders.reduce((s, o) => s + o.total, 0);
+
+  const discountTotal = rangeOrders.reduce((s, o) => s + o.discount, 0);
+  const shippingTotal = rangeOrders.reduce((s, o) => s + o.shippingFee, 0);
+  const subtotalTotal = rangeOrders.reduce((s, o) => s + o.subtotal, 0);
+
+  // Doanh thu theo ngày
   const dayMap = new Map<string, number>();
   for (
     let t = startOfDay(from).getTime();
@@ -143,7 +163,7 @@ export async function GET(req: NextRequest) {
     dayMap.set(key, (dayMap.get(key) || 0) + o.total);
   }
   const dailyRevenue = [...dayMap.entries()].map(([label, value]) => ({
-    label: label.slice(5), // MM-DD
+    label: label.slice(5),
     value,
   }));
 
@@ -154,7 +174,20 @@ export async function GET(req: NextRequest) {
     return { label, value };
   });
 
-  // Trang thai don (gom ca huy trong ky)
+  // Giờ cao điểm (0–23)
+  const hourMap = Array.from({ length: 24 }, (_, h) => ({
+    label: `${h}h`,
+    value: 0,
+  }));
+  for (const o of rangeOrders) {
+    hourMap[o.createdAt.getHours()].value += 1;
+  }
+  const peakHours = hourMap.filter((h) => h.value > 0);
+  const busyHours = [...hourMap]
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6)
+    .filter((h) => h.value > 0);
+
   const statusLabels: Record<string, string> = {
     pending: "Chờ xác nhận",
     confirmed: "Đã xác nhận",
@@ -171,9 +204,8 @@ export async function GET(req: NextRequest) {
     value: statusCount.get(k) || 0,
   }));
 
-  // Phuong thuc thanh toan
   const payLabels: Record<string, string> = {
-    cod: "COD",
+    cod: "COD / tiền mặt",
     transfer: "Chuyển khoản",
     vnpay: "VNPay",
   };
@@ -181,12 +213,18 @@ export async function GET(req: NextRequest) {
   for (const o of rangeOrders) {
     payMap.set(o.paymentMethod, (payMap.get(o.paymentMethod) || 0) + o.total);
   }
-  const revenueByPayment = [...payMap.entries()].map(([k, value]) => ({
-    label: payLabels[k] || k,
-    value,
-  }));
+  const revenueByPayment = [...payMap.entries()]
+    .map(([k, value]) => ({
+      label: payLabels[k] || k,
+      value,
+    }))
+    .sort((a, b) => b.value - a.value);
 
-  // Top SP theo so luong + doanh thu trong ky
+  const channelMix = [
+    { label: "Giao tận nơi", value: deliveryRevenue },
+    { label: "Nhận tại quầy", value: pickupRevenue },
+  ].filter((c) => c.value > 0);
+
   const orderIds = rangeOrders.map((o) => o.id);
   const items =
     orderIds.length === 0
@@ -200,6 +238,8 @@ export async function GET(req: NextRequest) {
             product: { select: { categoryId: true } },
           },
         });
+
+  const itemsSold = items.reduce((s, it) => s + it.quantity, 0);
 
   const productAgg = new Map<
     string,
@@ -216,7 +256,7 @@ export async function GET(req: NextRequest) {
     productAgg.set(it.productName, prev);
   }
   const topProducts = [...productAgg.entries()]
-    .sort((a, b) => b[1].qty - a[1].qty)
+    .sort((a, b) => b[1].revenue - a[1].revenue)
     .slice(0, 10)
     .map(([name, v]) => ({
       label: name.length > 28 ? name.slice(0, 28) + "…" : name,
@@ -235,16 +275,25 @@ export async function GET(req: NextRequest) {
     .slice(0, 10)
     .map(([label, value]) => ({ label, value }));
 
-  const spendByUser = new Map<string, { label: string; value: number }>();
+  const spendByUser = new Map<string, { label: string; value: number; orders: number }>();
   for (const o of rangeOrders) {
     if (!o.userId) continue;
     const prev = spendByUser.get(o.userId);
-    if (prev) prev.value += o.total;
-    else spendByUser.set(o.userId, { label: o.customerName, value: o.total });
+    if (prev) {
+      prev.value += o.total;
+      prev.orders += 1;
+    } else {
+      spendByUser.set(o.userId, {
+        label: o.customerName,
+        value: o.total,
+        orders: 1,
+      });
+    }
   }
   const topCustomers = [...spendByUser.values()]
     .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
+    .slice(0, 10)
+    .map(({ label, value, orders }) => ({ label, value, orders }));
 
   const lowStockItems = lowStock.map((p) => ({
     label: p.name.length > 28 ? p.name.slice(0, 28) + "…" : p.name,
@@ -257,26 +306,41 @@ export async function GET(req: NextRequest) {
       from: from.toISOString(),
       to: to.toISOString(),
       preset,
+      prevFrom: prevFrom.toISOString(),
+      prevTo: prevTo.toISOString(),
     },
     summary: {
       revenue,
       orderCount,
       avgOrder,
+      itemsSold,
       cancelledCount,
       cancelRate,
       paidCount,
+      unpaidCount,
+      unpaidAmount,
       pickupCount,
       deliveryCount,
-      discountTotal: rangeOrders.reduce((s, o) => s + o.discount, 0),
-      shippingTotal: rangeOrders.reduce((s, o) => s + o.shippingFee, 0),
+      pickupRevenue,
+      deliveryRevenue,
+      discountTotal,
+      shippingTotal,
+      subtotalTotal,
+      prevRevenue,
+      prevOrderCount,
+      revenueChangePct: pctChange(revenue, prevRevenue),
+      ordersChangePct: pctChange(orderCount, prevOrderCount),
     },
     monthlyRevenue,
     dailyRevenue,
+    peakHours: busyHours,
+    hourlyOrders: peakHours.length > 0 ? hourMap : [],
     topProducts,
     topCustomers,
     ordersByStatus,
     revenueByPayment,
     revenueByCategory,
+    channelMix,
     lowStockItems,
   });
 }

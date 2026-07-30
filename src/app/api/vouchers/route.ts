@@ -9,21 +9,30 @@ export type VoucherDto = {
   discount: number;
   minOrder: number;
   isActive: boolean;
+  usageCount?: number;
+  revenueImpact?: number;
 };
 
-function mapVoucher(v: {
-  id: string;
-  code: string;
-  discount: number;
-  minOrder: number;
-  isActive: boolean;
-}): VoucherDto {
+function mapVoucher(
+  v: {
+    id: string;
+    code: string;
+    discount: number;
+    minOrder: number;
+    isActive: boolean;
+  },
+  extra?: { usageCount?: number; revenueImpact?: number }
+): VoucherDto {
   return {
     id: v.id,
     code: v.code,
     discount: v.discount,
     minOrder: v.minOrder,
     isActive: v.isActive,
+    ...(extra?.usageCount !== undefined && { usageCount: extra.usageCount }),
+    ...(extra?.revenueImpact !== undefined && {
+      revenueImpact: extra.revenueImpact,
+    }),
   };
 }
 
@@ -38,7 +47,7 @@ export async function GET(req: NextRequest) {
       where: { isActive: true },
       orderBy: { code: "asc" },
     });
-    return apiSuccess(vouchers.map(mapVoucher));
+    return apiSuccess(vouchers.map((v) => mapVoucher(v)));
   }
 
   if (!session || !isOwnerRole(session.role)) {
@@ -46,7 +55,37 @@ export async function GET(req: NextRequest) {
   }
 
   const vouchers = await prisma.voucher.findMany({ orderBy: { code: "asc" } });
-  return apiSuccess(vouchers.map(mapVoucher));
+  const codes = vouchers.map((v) => v.code);
+  const usedOrders =
+    codes.length === 0
+      ? []
+      : await prisma.order.findMany({
+          where: {
+            voucherCode: { in: codes },
+            status: { not: "cancelled" },
+          },
+          select: { voucherCode: true, discount: true, total: true },
+        });
+
+  const usage = new Map<string, { count: number; impact: number }>();
+  for (const o of usedOrders) {
+    const code = (o.voucherCode || "").toUpperCase();
+    if (!code) continue;
+    const prev = usage.get(code) || { count: 0, impact: 0 };
+    prev.count += 1;
+    prev.impact += o.discount;
+    usage.set(code, prev);
+  }
+
+  return apiSuccess(
+    vouchers.map((v) => {
+      const u = usage.get(v.code.toUpperCase());
+      return mapVoucher(v, {
+        usageCount: u?.count || 0,
+        revenueImpact: u?.impact || 0,
+      });
+    })
+  );
 }
 
 export async function POST(req: NextRequest) {

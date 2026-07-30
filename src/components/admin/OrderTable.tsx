@@ -118,6 +118,47 @@ export function OrderTable() {
     }
   };
 
+  const handleMarkPaid = async (id: string) => {
+    const res = await api.orders.markPaid(id);
+    if (res.success && res.data) {
+      setSelectedOrder(res.data);
+      loadOrders();
+    } else {
+      alert(res.error || "Xác nhận thanh toán thất bại");
+    }
+  };
+
+  const handleExport = () => {
+    const params: Record<string, string> = {};
+    if (status) params.status = status;
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
+    const url = api.orders.exportCsv(params);
+    window.open(url, "_blank");
+  };
+
+  const handleBulkConfirm = async () => {
+    const pendingIds = filtered
+      .filter((o) => o.status === "pending")
+      .map((o) => o.id)
+      .slice(0, 50);
+    if (pendingIds.length === 0) {
+      alert("Không có đơn chờ xác nhận trong danh sách hiện tại");
+      return;
+    }
+    if (!confirm(`Xác nhận ${pendingIds.length} đơn đang chờ?`)) return;
+    const res = await api.orders.bulkStatus(pendingIds, "confirmed");
+    if (res.success && res.data) {
+      alert(
+        `Đã cập nhật ${res.data.updated} đơn` +
+          (res.data.skipped ? `, bỏ qua ${res.data.skipped}` : "")
+      );
+      loadOrders();
+    } else {
+      alert(res.error || "Cập nhật hàng loạt thất bại");
+    }
+  };
+
   return (
     <>
       <form
@@ -147,6 +188,22 @@ export function OrderTable() {
           </select>
           <Button type="submit" variant="outline" className="shrink-0">
             Tìm đơn
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="shrink-0"
+            onClick={handleBulkConfirm}
+          >
+            Xác nhận hàng loạt
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="shrink-0"
+            onClick={handleExport}
+          >
+            Xuất CSV
           </Button>
         </div>
 
@@ -298,6 +355,7 @@ export function OrderTable() {
           isOpen={!!selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onStatusUpdate={handleStatusUpdate}
+          onMarkPaid={handleMarkPaid}
         />
       )}
     </>

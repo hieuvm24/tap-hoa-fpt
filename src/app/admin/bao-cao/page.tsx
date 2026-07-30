@@ -10,28 +10,48 @@ import {
 import { api } from "@/lib/api";
 import { formatPrice } from "@/lib/utils";
 import { ChartData } from "@/types";
+import { cn } from "@/lib/utils";
 
 type ReportData = {
-  range: { from: string; to: string; preset: string };
+  range: {
+    from: string;
+    to: string;
+    preset: string;
+    prevFrom?: string;
+    prevTo?: string;
+  };
   summary: {
     revenue: number;
     orderCount: number;
     avgOrder: number;
+    itemsSold: number;
     cancelledCount: number;
     cancelRate: number;
     paidCount: number;
+    unpaidCount: number;
+    unpaidAmount: number;
     pickupCount: number;
     deliveryCount: number;
+    pickupRevenue: number;
+    deliveryRevenue: number;
     discountTotal: number;
     shippingTotal: number;
+    subtotalTotal: number;
+    prevRevenue: number;
+    prevOrderCount: number;
+    revenueChangePct: number;
+    ordersChangePct: number;
   };
   monthlyRevenue: ChartData[];
   dailyRevenue: ChartData[];
+  peakHours: ChartData[];
+  hourlyOrders: ChartData[];
   topProducts: (ChartData & { revenue?: number })[];
-  topCustomers: ChartData[];
+  topCustomers: (ChartData & { orders?: number })[];
   ordersByStatus: ChartData[];
   revenueByPayment: ChartData[];
   revenueByCategory: ChartData[];
+  channelMix: ChartData[];
   lowStockItems: (ChartData & { sku?: string })[];
 };
 
@@ -41,6 +61,19 @@ const PRESETS = [
   { id: "month", label: "Tháng này" },
   { id: "year", label: "Năm nay" },
 ] as const;
+
+function ChangePill({ value }: { value: number }) {
+  return (
+    <span
+      className={cn(
+        "ml-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold",
+        value >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+      )}
+    >
+      {value >= 0 ? "↑" : "↓"} {Math.abs(value)}% so với kỳ trước
+    </span>
+  );
+}
 
 export default function AdminReportsPage() {
   const [preset, setPreset] = useState<string>("month");
@@ -68,25 +101,27 @@ export default function AdminReportsPage() {
   }
 
   const s = data.summary;
-  const kpi = [
-    { label: "Doanh thu", value: formatPrice(s.revenue) },
-    { label: "Số đơn", value: String(s.orderCount) },
-    { label: "Giá trị TB/đơn", value: formatPrice(s.avgOrder) },
-    { label: "Tỷ lệ hủy", value: `${s.cancelRate}% (${s.cancelledCount})` },
-    { label: "Giao tận nơi", value: String(s.deliveryCount) },
-    { label: "Nhận tại quầy", value: String(s.pickupCount) },
-    { label: "Đã thanh toán", value: String(s.paidCount) },
-    { label: "Giảm giá đã áp", value: formatPrice(s.discountTotal) },
-  ];
+  const dailyChart =
+    data.dailyRevenue.length > 45
+      ? data.dailyRevenue.filter((_, i) => i % 2 === 0)
+      : data.dailyRevenue;
 
   return (
     <div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Báo cáo chi tiết</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Báo cáo kinh doanh</h1>
           <p className="mt-1 text-sm text-gray-500">
             Kỳ: {new Date(data.range.from).toLocaleDateString("vi-VN")} →{" "}
             {new Date(data.range.to).toLocaleDateString("vi-VN")}
+            {data.range.prevFrom && (
+              <span className="text-gray-400">
+                {" "}
+                · so với{" "}
+                {new Date(data.range.prevFrom).toLocaleDateString("vi-VN")} →{" "}
+                {new Date(data.range.prevTo!).toLocaleDateString("vi-VN")}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -107,33 +142,108 @@ export default function AdminReportsPage() {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {kpi.map((item) => (
-          <Card key={item.label} className="!p-4">
-            <p className="text-xs text-gray-500">{item.label}</p>
-            <p className="mt-1 text-lg font-bold text-gray-900">{item.value}</p>
+      {/* KPI chính */}
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Hiệu quả bán hàng
+        </h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Doanh thu</p>
+            <p className="mt-1 text-xl font-bold text-gray-900">
+              {formatPrice(s.revenue)}
+            </p>
+            <ChangePill value={s.revenueChangePct} />
           </Card>
-        ))}
-      </div>
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Số đơn</p>
+            <p className="mt-1 text-xl font-bold text-gray-900">{s.orderCount}</p>
+            <ChangePill value={s.ordersChangePct} />
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Giá trị TB / đơn</p>
+            <p className="mt-1 text-xl font-bold text-gray-900">
+              {formatPrice(s.avgOrder)}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              {s.itemsSold} sản phẩm đã bán
+            </p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Tỷ lệ hủy</p>
+            <p className="mt-1 text-xl font-bold text-gray-900">{s.cancelRate}%</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {s.cancelledCount} đơn hủy trong kỳ
+            </p>
+          </Card>
+        </div>
+      </section>
+
+      {/* Tiền & kênh */}
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Thu tiền & kênh bán
+        </h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Đã thu / đã thanh toán</p>
+            <p className="mt-1 text-lg font-bold text-emerald-700">
+              {s.paidCount} đơn
+            </p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Chưa thu (COD…)</p>
+            <p className="mt-1 text-lg font-bold text-amber-700">
+              {formatPrice(s.unpaidAmount)}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">{s.unpaidCount} đơn</p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Giao tận nơi</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
+              {formatPrice(s.deliveryRevenue)}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">{s.deliveryCount} đơn</p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Nhận tại quầy</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
+              {formatPrice(s.pickupRevenue)}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">{s.pickupCount} đơn</p>
+          </Card>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Doanh thu hàng (trước ship)</p>
+            <p className="mt-1 font-bold text-gray-900">
+              {formatPrice(s.subtotalTotal)}
+            </p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs text-gray-500">Giảm giá đã áp</p>
+            <p className="mt-1 font-bold text-gray-900">
+              {formatPrice(s.discountTotal)}
+            </p>
+          </Card>
+          <Card className="!p-4 col-span-2 md:col-span-1">
+            <p className="text-xs text-gray-500">Phí ship thu được</p>
+            <p className="mt-1 font-bold text-gray-900">
+              {formatPrice(s.shippingTotal)}
+            </p>
+          </Card>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="lg:col-span-2">
-          <CardTitle className="mb-4">
-            Doanh thu theo ngày (kỳ đã chọn)
-          </CardTitle>
-          {data.dailyRevenue.length > 45 ? (
+          <CardTitle className="mb-4">Doanh thu theo ngày</CardTitle>
+          {data.dailyRevenue.length > 45 && (
             <p className="mb-2 text-xs text-gray-400">
-              Biểu đồ rút gọn — xem thêm doanh thu theo tháng bên dưới.
+              Biểu đồ rút gọn — xem doanh thu theo tháng bên dưới.
             </p>
-          ) : null}
-          <BarChart
-            data={
-              data.dailyRevenue.length > 45
-                ? data.dailyRevenue.filter((_, i) => i % 2 === 0)
-                : data.dailyRevenue
-            }
-            valueFormat="millions"
-          />
+          )}
+          <BarChart data={dailyChart} valueFormat="millions" />
         </Card>
 
         <Card className="lg:col-span-2">
@@ -144,8 +254,30 @@ export default function AdminReportsPage() {
         </Card>
 
         <Card>
-          <CardTitle className="mb-4">Đơn theo trạng thái</CardTitle>
-          <HorizontalBarChart data={data.ordersByStatus} color="bg-amber-500" />
+          <CardTitle className="mb-4">Online vs tại quầy</CardTitle>
+          {data.channelMix.length === 0 ? (
+            <p className="text-sm text-gray-400">Chưa có doanh thu kỳ này.</p>
+          ) : (
+            <HorizontalBarChart
+              data={data.channelMix}
+              valueFormat="millions"
+              color="bg-teal-500"
+            />
+          )}
+        </Card>
+
+        <Card>
+          <CardTitle className="mb-4">Giờ cao điểm (số đơn)</CardTitle>
+          {data.peakHours.length === 0 ? (
+            <p className="text-sm text-gray-400">Chưa đủ dữ liệu.</p>
+          ) : (
+            <>
+              <HorizontalBarChart data={data.peakHours} color="bg-violet-500" />
+              <p className="mt-3 text-xs text-gray-400">
+                Gợi ý: sắp xếp nhân sự / ship quanh các khung giờ đông khách.
+              </p>
+            </>
+          )}
         </Card>
 
         <Card>
@@ -158,6 +290,11 @@ export default function AdminReportsPage() {
         </Card>
 
         <Card>
+          <CardTitle className="mb-4">Đơn theo trạng thái</CardTitle>
+          <HorizontalBarChart data={data.ordersByStatus} color="bg-amber-500" />
+        </Card>
+
+        <Card>
           <CardTitle className="mb-4">Doanh thu theo danh mục</CardTitle>
           <HorizontalBarChart
             data={data.revenueByCategory}
@@ -167,15 +304,22 @@ export default function AdminReportsPage() {
         </Card>
 
         <Card>
-          <CardTitle className="mb-4">Top sản phẩm (số lượng bán)</CardTitle>
-          <HorizontalBarChart data={data.topProducts} color="bg-indigo-500" />
+          <CardTitle className="mb-4">Top sản phẩm (theo doanh thu)</CardTitle>
+          <HorizontalBarChart
+            data={data.topProducts.map((p) => ({
+              label: p.label,
+              value: p.revenue || 0,
+            }))}
+            valueFormat="millions"
+            color="bg-indigo-500"
+          />
           {data.topProducts.length > 0 && (
             <ul className="mt-4 max-h-40 space-y-1 overflow-y-auto text-xs text-gray-500">
-              {data.topProducts.slice(0, 5).map((p) => (
+              {data.topProducts.slice(0, 8).map((p) => (
                 <li key={p.label} className="flex justify-between gap-2">
                   <span className="truncate">{p.label}</span>
-                  <span className="shrink-0 font-medium text-primary-600">
-                    {formatPrice(p.revenue || 0)}
+                  <span className="shrink-0">
+                    {p.value} sp · {formatPrice(p.revenue || 0)}
                   </span>
                 </li>
               ))}
@@ -190,10 +334,20 @@ export default function AdminReportsPage() {
             valueFormat="millions"
             color="bg-orange-500"
           />
+          {data.topCustomers.length > 0 && (
+            <ul className="mt-4 max-h-36 space-y-1 overflow-y-auto text-xs text-gray-500">
+              {data.topCustomers.slice(0, 5).map((c) => (
+                <li key={c.label} className="flex justify-between gap-2">
+                  <span className="truncate">{c.label}</span>
+                  <span className="shrink-0">{c.orders || 0} đơn</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
 
         <Card>
-          <CardTitle className="mb-4">Sắp hết hàng (≤ 10)</CardTitle>
+          <CardTitle className="mb-4">Cần nhập hàng (tồn ≤ 10)</CardTitle>
           {data.lowStockItems.length === 0 ? (
             <p className="text-sm text-gray-500">Không có sản phẩm sắp hết.</p>
           ) : (
@@ -201,15 +355,18 @@ export default function AdminReportsPage() {
               {data.lowStockItems.map((p) => (
                 <li
                   key={p.label + p.sku}
-                  className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-sm"
+                  className={cn(
+                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm",
+                    p.value <= 0 ? "bg-red-100" : "bg-red-50"
+                  )}
                 >
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-gray-900">
-                      {p.label}
-                    </p>
+                    <p className="truncate font-medium text-gray-900">{p.label}</p>
                     <p className="text-xs text-gray-500">{p.sku}</p>
                   </div>
-                  <span className="font-bold text-red-600">còn {p.value}</span>
+                  <span className="font-bold text-red-600">
+                    {p.value <= 0 ? "Hết hàng" : `còn ${p.value}`}
+                  </span>
                 </li>
               ))}
             </ul>

@@ -44,6 +44,7 @@ function AccountContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
+  const [editingAddrId, setEditingAddrId] = useState<string | null>(null);
   const [addrForm, setAddrForm] = useState({
     label: "Nhà",
     fullName: "",
@@ -93,7 +94,9 @@ function AccountContent() {
   };
 
   const handleAddAddress = async () => {
-    const res = await api.addresses.create(addrForm);
+    const res = editingAddrId
+      ? await api.addresses.update(editingAddrId, addrForm)
+      : await api.addresses.create(addrForm);
     if (res.success) {
       setAddrForm({
         label: "Nhà",
@@ -102,10 +105,22 @@ function AccountContent() {
         address: "",
         isDefault: false,
       });
+      setEditingAddrId(null);
       loadAddresses();
     } else {
-      alert(res.error || "Không thêm được địa chỉ");
+      alert(res.error || "Không lưu được địa chỉ");
     }
+  };
+
+  const handleEditAddress = (a: Address) => {
+    setEditingAddrId(a.id);
+    setAddrForm({
+      label: a.label,
+      fullName: a.fullName,
+      phone: a.phone,
+      address: a.address,
+      isDefault: a.isDefault,
+    });
   };
 
   const handleDeleteAddress = async (id: string) => {
@@ -269,12 +284,21 @@ function AccountContent() {
                       <p className="text-sm text-gray-600">{a.phone}</p>
                       <p className="text-sm text-gray-500">{a.address}</p>
                     </div>
-                    <button
-                      onClick={() => handleDeleteAddress(a.id)}
-                      className="text-red-500 hover:bg-red-50 rounded-lg p-2 h-fit"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex gap-1 h-fit">
+                      <button
+                        type="button"
+                        onClick={() => handleEditAddress(a)}
+                        className="text-primary-600 hover:bg-primary-50 rounded-lg px-2 py-2 text-xs font-medium"
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAddress(a.id)}
+                        className="text-red-500 hover:bg-red-50 rounded-lg p-2 h-fit"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {addresses.length === 0 && (
@@ -282,7 +306,9 @@ function AccountContent() {
                 )}
               </div>
               <div className="border-t pt-4 space-y-3 max-w-md">
-                <h3 className="font-medium">Thêm địa chỉ mới</h3>
+                <h3 className="font-medium">
+                  {editingAddrId ? "Sửa địa chỉ" : "Thêm địa chỉ mới"}
+                </h3>
                 <Input
                   label="Nhãn"
                   value={addrForm.label}
@@ -314,8 +340,26 @@ function AccountContent() {
                   Đặt làm mặc định
                 </label>
                 <Button size="sm" onClick={handleAddAddress}>
-                  + Lưu địa chỉ
+                  {editingAddrId ? "Cập nhật địa chỉ" : "+ Lưu địa chỉ"}
                 </Button>
+                {editingAddrId && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingAddrId(null);
+                      setAddrForm({
+                        label: "Nhà",
+                        fullName: user?.name || "",
+                        phone: user?.phone || "",
+                        address: "",
+                        isDefault: false,
+                      });
+                    }}
+                  >
+                    Hủy sửa
+                  </Button>
+                )}
               </div>
             </Card>
           )}

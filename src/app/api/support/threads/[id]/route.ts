@@ -124,3 +124,46 @@ export async function POST(
 
   return apiSuccess(mapMessage(message), 201);
 }
+
+/** Đóng / mở lại hội thoại hỗ trợ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSession();
+  if (!session || !isAdminRole(session.role)) {
+    return apiError("Forbidden", 403);
+  }
+
+  const { id } = await params;
+  const body = await req.json();
+  const status = String(body.status || "");
+  if (status !== "open" && status !== "closed") {
+    return apiError("status phải là open hoặc closed");
+  }
+
+  const thread = await prisma.supportThread.findUnique({ where: { id } });
+  if (!thread) return apiError("Không tìm thấy hội thoại", 404);
+
+  const updated = await prisma.supportThread.update({
+    where: { id },
+    data: { status },
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, phone: true },
+      },
+    },
+  });
+
+  return apiSuccess({
+    id: updated.id,
+    status: updated.status,
+    lastMessageAt: updated.lastMessageAt.toISOString(),
+    customer: {
+      id: updated.user.id,
+      name: updated.user.name,
+      email: updated.user.email,
+      phone: updated.user.phone || undefined,
+    },
+  });
+}

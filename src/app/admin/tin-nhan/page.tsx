@@ -32,6 +32,8 @@ export default function AdminSupportPage() {
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
+  const [threadStatus, setThreadStatus] = useState<string>("open");
+
   const loadThreads = useCallback(async () => {
     const res = await api.support.listThreads();
     if (res.success && res.data) {
@@ -45,6 +47,7 @@ export default function AdminSupportPage() {
     const res = await api.support.getThread(id);
     if (res.success && res.data) {
       setMessages(res.data.messages || []);
+      setThreadStatus(res.data.status || "open");
       setCustomerLabel(
         res.data.customer
           ? `${res.data.customer.name} · ${res.data.customer.phone || res.data.customer.email}`
@@ -135,16 +138,36 @@ export default function AdminSupportPage() {
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-primary-600">
-                  <User className="h-4 w-4" />
+              <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-primary-600">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-900">
+                      {customerLabel || "Khách hàng"}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {threadStatus === "closed" ? "Đã đóng" : "Đang mở"}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {customerLabel || "Khách hàng"}
-                  </p>
-                  <p className="text-xs text-gray-500">Chat trực tiếp</p>
-                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    if (!activeId) return;
+                    const next = threadStatus === "closed" ? "open" : "closed";
+                    const res = await api.support.setStatus(activeId, next);
+                    if (res.success) {
+                      setThreadStatus(next);
+                      await loadThreads();
+                    }
+                  }}
+                >
+                  {threadStatus === "closed" ? "Mở lại" : "Đóng hội thoại"}
+                </Button>
               </div>
               <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-4">
                 {messages.map((m) => (

@@ -16,6 +16,15 @@ async function request<T>(
 }
 
 export const api = {
+  health: () =>
+    request<{
+      status: string;
+      database: string;
+      uptimeMs: number;
+      latencyMs: number;
+      timestamp: string;
+    }>("/health"),
+
   upload: async (
     file: File,
     folder: "products" | "avatars" | "news" | "promotions" = "products"
@@ -73,6 +82,19 @@ export const api = {
         brands: string[];
       }>(`/products${qs}`);
     },
+    byIds: (ids: string[]) => {
+      if (ids.length === 0) {
+        return Promise.resolve({
+          success: true as const,
+          data: { products: [] as import("@/types").Product[], total: 0, brands: [] as string[] },
+        });
+      }
+      return request<{
+        products: import("@/types").Product[];
+        total: number;
+        brands: string[];
+      }>(`/products?ids=${encodeURIComponent(ids.slice(0, 50).join(","))}`);
+    },
     featured: () =>
       request<import("@/types").Product[]>("/products?featured=true"),
     getBySlug: (slug: string) =>
@@ -89,6 +111,24 @@ export const api = {
       request<import("@/types").Product>(`/products/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
+      }),
+    adjustStock: (
+      id: string,
+      data: { quantity?: number; delta?: number; reason?: string }
+    ) =>
+      request<{
+        product: import("@/types").Product;
+        previousStock: number;
+        stock: number;
+        delta: number;
+        reason?: string;
+      }>(`/products/${id}/stock`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    duplicate: (id: string) =>
+      request<import("@/types").Product>(`/products/${id}/duplicate`, {
+        method: "POST",
       }),
     delete: (id: string) =>
       request(`/products/${id}`, { method: "DELETE" }),
@@ -115,6 +155,8 @@ export const api = {
       const qs = params ? "?" + new URLSearchParams(params).toString() : "";
       return request<import("@/types").Order[]>(`/orders${qs}`);
     },
+    get: (id: string) =>
+      request<import("@/types").Order>(`/orders/${id}`),
     create: (data: Record<string, unknown>) =>
       request<import("@/types").Order>("/orders", {
         method: "POST",
@@ -125,11 +167,53 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ status, note }),
       }),
+    markPaid: (id: string, note?: string) =>
+      request<import("@/types").Order>(`/orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ paymentStatus: "paid", note }),
+      }),
+    updatePayment: (
+      id: string,
+      paymentStatus: "pending" | "paid" | "failed",
+      note?: string
+    ) =>
+      request<import("@/types").Order>(`/orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ paymentStatus, note }),
+      }),
+    bulkStatus: (ids: string[], status: string, note?: string) =>
+      request<{
+        updated: number;
+        skipped: number;
+        orders: import("@/types").Order[];
+        errors: { id: string; orderCode?: string; reason: string }[];
+      }>("/orders/bulk-status", {
+        method: "POST",
+        body: JSON.stringify({ ids, status, note }),
+      }),
+    exportCsv: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return `${BASE}/orders/export${qs}`;
+    },
     cancel: (id: string, note?: string) =>
       request<import("@/types").Order>(`/orders/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ action: "cancel", note }),
       }),
+    reorder: (id: string) =>
+      request<{
+        orderCode: string;
+        items: {
+          productId: string;
+          name: string;
+          slug: string;
+          price: number;
+          image: string;
+          quantity: number;
+          maxStock: number;
+        }[];
+        unavailable: { productId: string; name: string; reason: string }[];
+      }>(`/orders/${id}/reorder`, { method: "POST" }),
   },
 
   promotions: {
@@ -165,6 +249,8 @@ export const api = {
           discount: number;
           minOrder: number;
           isActive: boolean;
+          usageCount?: number;
+          revenueImpact?: number;
         }[]
       >(`/vouchers${activeOnly ? "?active=true" : ""}`),
     create: (data: Record<string, unknown>) =>
@@ -198,11 +284,25 @@ export const api = {
       request<import("@/types").Review[]>(
         `/reviews${productId ? `?productId=${productId}` : ""}`
       ),
+    listAdmin: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams({ all: "true", ...params }).toString();
+      return request<{
+        reviews: (import("@/types").Review & {
+          productName?: string;
+          productSlug?: string;
+        })[];
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/reviews?${qs}`);
+    },
     create: (data: { productId: string; rating: number; comment: string }) =>
       request<import("@/types").Review>("/reviews", {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    delete: (id: string) =>
+      request(`/reviews/${id}`, { method: "DELETE" }),
   },
 
   recommendations: {
@@ -287,6 +387,21 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ content }),
       }),
+    setStatus: (threadId: string, status: "open" | "closed") =>
+      request<{
+        id: string;
+        status: string;
+        lastMessageAt: string;
+        customer?: {
+          id: string;
+          name: string;
+          email: string;
+          phone?: string;
+        };
+      }>(`/support/threads/${threadId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }),
   },
 
   payments: {
@@ -359,7 +474,19 @@ export const api = {
   },
 
   customers: {
-    list: () => request<import("@/types").Customer[]>("/customers"),
+    list: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<
+        | import("@/types").Customer[]
+        | {
+            customers: import("@/types").Customer[];
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
+          }
+      >(`/customers${qs}`);
+    },
     get: (id: string) =>
       request<
         import("@/types").Customer & {
@@ -382,6 +509,47 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+  },
+
+  staff: {
+    list: () =>
+      request<
+        {
+          id: string;
+          email: string;
+          name: string;
+          phone?: string;
+          role: "STAFF" | "OWNER";
+          avatar?: string;
+          createdAt: string;
+        }[]
+      >("/admin/staff"),
+    create: (data: {
+      name: string;
+      email: string;
+      phone?: string;
+      password: string;
+      role?: "STAFF" | "OWNER";
+    }) =>
+      request("/admin/staff", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (
+      id: string,
+      data: {
+        name?: string;
+        phone?: string;
+        password?: string;
+        role?: "STAFF" | "OWNER";
+      }
+    ) =>
+      request(`/admin/staff/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request(`/admin/staff/${id}`, { method: "DELETE" }),
   },
 
   adminSearch: {
@@ -410,36 +578,89 @@ export const api = {
       }>(`/admin/search?q=${encodeURIComponent(q)}`),
   },
 
+  adminNotifications: {
+    list: () =>
+      request<{
+        counts: {
+          pendingOrders: number;
+          unpaid: number;
+          lowStock: number;
+          supportUnread: number;
+        };
+        total: number;
+        items: {
+          id: string;
+          type: "order_pending" | "unpaid" | "low_stock" | "support";
+          title: string;
+          subtitle: string;
+          href: string;
+          createdAt: string;
+        }[];
+      }>("/admin/notifications"),
+  },
+
   dashboard: {
     stats: () =>
       request<{
         stats: import("@/types").DashboardStats;
         revenueChart: import("@/types").ChartData[];
         ordersChart: import("@/types").ChartData[];
+        actionOrders: {
+          id: string;
+          orderCode: string;
+          customerName: string;
+          total: number;
+          status: string;
+          fulfillmentType: string;
+          paymentMethod: string;
+          paymentStatus: string;
+          createdAt: string;
+        }[];
+        lowStockItems: (import("@/types").ChartData & { sku?: string })[];
+        topWeekProducts: import("@/types").ChartData[];
       }>("/dashboard/stats"),
     reports: (params?: Record<string, string>) => {
       const qs = params ? "?" + new URLSearchParams(params).toString() : "";
       return request<{
-        range: { from: string; to: string; preset: string };
+        range: {
+          from: string;
+          to: string;
+          preset: string;
+          prevFrom?: string;
+          prevTo?: string;
+        };
         summary: {
           revenue: number;
           orderCount: number;
           avgOrder: number;
+          itemsSold: number;
           cancelledCount: number;
           cancelRate: number;
           paidCount: number;
+          unpaidCount: number;
+          unpaidAmount: number;
           pickupCount: number;
           deliveryCount: number;
+          pickupRevenue: number;
+          deliveryRevenue: number;
           discountTotal: number;
           shippingTotal: number;
+          subtotalTotal: number;
+          prevRevenue: number;
+          prevOrderCount: number;
+          revenueChangePct: number;
+          ordersChangePct: number;
         };
         monthlyRevenue: import("@/types").ChartData[];
         dailyRevenue: import("@/types").ChartData[];
+        peakHours: import("@/types").ChartData[];
+        hourlyOrders: import("@/types").ChartData[];
         topProducts: (import("@/types").ChartData & { revenue?: number })[];
-        topCustomers: import("@/types").ChartData[];
+        topCustomers: (import("@/types").ChartData & { orders?: number })[];
         ordersByStatus: import("@/types").ChartData[];
         revenueByPayment: import("@/types").ChartData[];
         revenueByCategory: import("@/types").ChartData[];
+        channelMix: import("@/types").ChartData[];
         lowStockItems: (import("@/types").ChartData & { sku?: string })[];
       }>(`/dashboard/reports${qs}`);
     },

@@ -21,8 +21,37 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get("limit") || "50");
   const all = searchParams.get("all") === "true";
   const statusFilter = searchParams.get("status");
+  const idsParam = searchParams.get("ids")?.trim() || "";
 
   const where: Record<string, unknown> = {};
+
+  // Lấy theo danh sách id (gợi ý / đã xem gần đây)
+  if (idsParam) {
+    const ids = idsParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 50);
+    if (ids.length === 0) {
+      return apiSuccess({ products: [], total: 0, brands: [] });
+    }
+    const byIds = await prisma.product.findMany({
+      where: {
+        id: { in: ids },
+        ...(session && isAdminRole(session.role) ? {} : { status: "ACTIVE" }),
+      },
+      include: { category: true },
+    });
+    const orderMap = new Map(ids.map((id, i) => [id, i]));
+    byIds.sort(
+      (a, b) => (orderMap.get(a.id) ?? 99) - (orderMap.get(b.id) ?? 99)
+    );
+    return apiSuccess({
+      products: byIds.map(mapProduct),
+      total: byIds.length,
+      brands: [],
+    });
+  }
 
   // Khách chỉ thấy ACTIVE; admin có thể ?all=true hoặc ?status=
   if (all && session && isAdminRole(session.role)) {

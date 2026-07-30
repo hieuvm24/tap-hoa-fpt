@@ -28,6 +28,7 @@ export function ProductModal({ isOpen, onClose, product, onSaved }: ProductModal
     description: "",
     brand: "",
     image: "",
+    isFeatured: false,
   });
 
   useEffect(() => {
@@ -50,12 +51,13 @@ export function ProductModal({ isOpen, onClose, product, onSaved }: ProductModal
         description: product.description,
         brand: product.brand,
         image: product.image,
+        isFeatured: product.isFeatured,
       });
     } else {
       setForm({
         name: "", slug: "", sku: "", price: 0, originalPrice: 0, stock: 0,
         categorySlug: "rau-cu", status: "active", description: "", brand: "",
-        image: "",
+        image: "", isFeatured: false,
       });
     }
   }, [product, isOpen]);
@@ -117,6 +119,16 @@ export function ProductModal({ isOpen, onClose, product, onSaved }: ProductModal
           </div>
         </div>
         <Input label="Thương hiệu" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={form.isFeatured}
+            onChange={(e) =>
+              setForm({ ...form, isFeatured: e.target.checked })
+            }
+          />
+          Hiển thị ở mục nổi bật (trang chủ)
+        </label>
         <ImageUpload
           label="Ảnh sản phẩm"
           folder="products"

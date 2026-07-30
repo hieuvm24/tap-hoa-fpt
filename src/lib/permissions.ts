@@ -13,7 +13,9 @@ export type AdminPermission =
   | "vouchers"
   | "news"
   | "reports"
-  | "settings";
+  | "settings"
+  | "staff"
+  | "reviews";
 
 const STAFF_PERMISSIONS: AdminPermission[] = [
   "dashboard",
@@ -22,6 +24,7 @@ const STAFF_PERMISSIONS: AdminPermission[] = [
   "pos",
   "customers",
   "support",
+  "reviews",
 ];
 
 const OWNER_PERMISSIONS: AdminPermission[] = [
@@ -32,6 +35,7 @@ const OWNER_PERMISSIONS: AdminPermission[] = [
   "news",
   "reports",
   "settings",
+  "staff",
 ];
 
 export function isOwner(role?: UserRole | string | null): boolean {
@@ -70,6 +74,7 @@ export function canAccessAdminPath(
     "/admin/ban-tai-quay",
     "/admin/khach-hang",
     "/admin/tin-nhan",
+    "/admin/danh-gia",
   ];
   if (pathname === "/admin") return true;
   return staffPaths.some(
@@ -90,9 +95,11 @@ export const ADMIN_MENU: {
   { href: "/admin/ban-tai-quay", label: "Bán tại quầy", permission: "pos" },
   { href: "/admin/khach-hang", label: "Khách hàng", permission: "customers" },
   { href: "/admin/tin-nhan", label: "Tin nhắn", permission: "support" },
+  { href: "/admin/danh-gia", label: "Đánh giá", permission: "reviews" },
   { href: "/admin/khuyen-mai", label: "Khuyến mãi", permission: "promotions" },
   { href: "/admin/voucher", label: "Voucher", permission: "vouchers" },
   { href: "/admin/tin-tuc", label: "Tin tức", permission: "news" },
   { href: "/admin/bao-cao", label: "Báo cáo", permission: "reports" },
+  { href: "/admin/nhan-vien", label: "Nhân viên", permission: "staff" },
   { href: "/admin/cai-dat", label: "Cài đặt", permission: "settings" },
 ];

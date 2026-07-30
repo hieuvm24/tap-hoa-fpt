@@ -39,7 +39,10 @@ function AdminCustomersPageContent() {
   const loadList = useCallback(async () => {
     setLoading(true);
     const res = await api.customers.list();
-    if (res.success && res.data) setCustomers(res.data);
+    if (res.success && res.data) {
+      const data = res.data;
+      setCustomers(Array.isArray(data) ? data : data.customers);
+    }
     setLoading(false);
   }, []);
 

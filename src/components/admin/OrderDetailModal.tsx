@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Check, Truck, Package, X, Store } from "lucide-react";
+import { Check, Truck, Package, X, Store, Wallet } from "lucide-react";
 import { Order, OrderStatus } from "@/types";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { Modal, Button, Badge } from "@/components/ui";
@@ -12,6 +12,7 @@ interface OrderDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onStatusUpdate: (id: string, status: OrderStatus) => void;
+  onMarkPaid?: (id: string) => void;
 }
 
 const statusLabels: Record<OrderStatus, string> = {
@@ -70,52 +71,70 @@ export function OrderDetailModal({
   isOpen,
   onClose,
   onStatusUpdate,
+  onMarkPaid,
 }: OrderDetailModalProps) {
   const canAct = order.status !== "delivered" && order.status !== "cancelled";
   const next = nextStatusFor(order);
   const isPickup = order.fulfillmentType === "pickup";
+  const canMarkPaid =
+    order.paymentStatus !== "paid" &&
+    order.status !== "cancelled" &&
+    (order.paymentMethod === "cod" || order.paymentMethod === "transfer");
 
-  const footer = canAct ? (
-    <div className="flex flex-wrap gap-2">
-      {next && (
-        <Button
-          size="sm"
-          className="gap-1"
-          onClick={() => onStatusUpdate(order.id, next)}
-        >
-          {order.status === "pending" && (
-            <>
-              <Check className="h-4 w-4" /> Xác nhận
-            </>
-          )}
-          {order.status === "confirmed" && !isPickup && (
-            <>
-              <Truck className="h-4 w-4" /> Đang giao
-            </>
-          )}
-          {order.status === "confirmed" && isPickup && (
-            <>
-              <Store className="h-4 w-4" /> Đã lấy tại quầy
-            </>
-          )}
-          {order.status === "shipping" && (
-            <>
-              <Package className="h-4 w-4" /> Hoàn thành
-            </>
-          )}
-        </Button>
-      )}
-      <Button
-        variant="danger"
-        size="sm"
-        className="gap-1"
-        onClick={() => onStatusUpdate(order.id, "cancelled")}
-      >
-        <X className="h-4 w-4" />
-        Hủy đơn
-      </Button>
-    </div>
-  ) : undefined;
+  const footer =
+    canAct || canMarkPaid ? (
+      <div className="flex flex-wrap gap-2">
+        {canMarkPaid && onMarkPaid && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1"
+            onClick={() => onMarkPaid(order.id)}
+          >
+            <Wallet className="h-4 w-4" /> Đã thu tiền
+          </Button>
+        )}
+        {canAct && next && (
+          <Button
+            size="sm"
+            className="gap-1"
+            onClick={() => onStatusUpdate(order.id, next)}
+          >
+            {order.status === "pending" && (
+              <>
+                <Check className="h-4 w-4" /> Xác nhận
+              </>
+            )}
+            {order.status === "confirmed" && !isPickup && (
+              <>
+                <Truck className="h-4 w-4" /> Đang giao
+              </>
+            )}
+            {order.status === "confirmed" && isPickup && (
+              <>
+                <Store className="h-4 w-4" /> Đã lấy tại quầy
+              </>
+            )}
+            {order.status === "shipping" && (
+              <>
+                <Package className="h-4 w-4" /> Hoàn thành
+              </>
+            )}
+          </Button>
+        )}
+        {canAct && (
+          <Button
+            variant="danger"
+            size="sm"
+            className="gap-1"
+            onClick={() => onStatusUpdate(order.id, "cancelled")}
+          >
+            <X className="h-4 w-4" />
+            Hủy đơn
+          </Button>
+        )}
+      </div>
+    ) : undefined;
 
   return (
     <Modal

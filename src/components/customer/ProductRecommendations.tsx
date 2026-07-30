@@ -46,7 +46,8 @@ export function ProductRecommendations({
   const [allProducts, setAllProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    api.products.list({ limit: "200" }).then((res) => {
+    // Fallback client chỉ khi API recommendations lỗi — tải vừa đủ
+    api.products.list({ limit: "80", sort: "sold" }).then((res) => {
       if (res.success && res.data) {
         const list = Array.isArray(res.data) ? res.data : res.data.products;
         setAllProducts(list);
@@ -57,11 +58,21 @@ export function ProductRecommendations({
   useEffect(() => {
     if (product) trackRecentlyViewed(product.id);
 
-    const recentIds = getRecentIds().join(",");
+    const recentIds = getRecentIds();
 
     if (variant === "recent") {
-      if (!allProducts.length) return;
-      setItems(getRecentlyViewed(allProducts, product?.id));
+      const ids = recentIds.filter((id) => id !== product?.id).slice(0, limit);
+      if (ids.length === 0) {
+        setItems([]);
+        return;
+      }
+      api.products.byIds(ids).then((res) => {
+        if (res.success && res.data?.products) {
+          setItems(res.data.products);
+        } else if (allProducts.length) {
+          setItems(getRecentlyViewed(allProducts, product?.id).slice(0, limit));
+        }
+      });
       return;
     }
 
@@ -79,7 +90,7 @@ export function ProductRecommendations({
       limit: String(limit),
     };
     if (product?.id) params.productId = product.id;
-    if (recentIds) params.recentIds = recentIds;
+    if (recentIds.length) params.recentIds = recentIds.join(",");
     if (variant === "cart" && cartProductIds?.length) {
       params.cartIds = cartProductIds.join(",");
     }

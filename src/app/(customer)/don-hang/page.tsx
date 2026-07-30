@@ -9,7 +9,10 @@ import { Order, OrderStatus } from "@/types";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { Product } from "@/types";
 
 const statusConfig: Record<
   OrderStatus,
@@ -54,6 +57,8 @@ function OrdersContent() {
   const [lookupError, setLookupError] = useState("");
   const [guestMode, setGuestMode] = useState(false);
   const { isAuthenticated } = useAuth();
+  const { addItem } = useCart();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const newOrderCode = searchParams.get("code");
   const phoneParam = searchParams.get("phone") || "";
@@ -290,30 +295,90 @@ function OrdersContent() {
                   · {paymentStatusLabels[selectedOrder.paymentStatus] ||
                     selectedOrder.paymentStatus}
                 </p>
-                {isAuthenticated &&
-                  (selectedOrder.status === "pending" ||
-                    selectedOrder.status === "confirmed") &&
-                  selectedOrder.paymentStatus !== "paid" && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {isAuthenticated &&
+                    selectedOrder.paymentMethod === "vnpay" &&
+                    selectedOrder.paymentStatus !== "paid" &&
+                    selectedOrder.status !== "cancelled" && (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          const res = await api.payments.createVnpay({
+                            orderId: selectedOrder.id,
+                          });
+                          if (res.success && res.data?.paymentUrl) {
+                            window.location.href = res.data.paymentUrl;
+                          } else {
+                            alert(res.error || "Không tạo được link VNPay");
+                          }
+                        }}
+                      >
+                        Thanh toán lại VNPay
+                      </Button>
+                    )}
+                  {isAuthenticated && selectedOrder.status === "delivered" && (
                     <Button
-                      variant="outline"
                       size="sm"
-                      className="mt-4 text-red-600 border-red-200 hover:bg-red-50"
+                      variant="outline"
                       onClick={async () => {
-                        if (!confirm("Bạn chắc chắn muốn hủy đơn này?")) return;
-                        const res = await api.orders.cancel(selectedOrder.id);
-                        if (res.success && res.data) {
-                          setOrders((prev) =>
-                            prev.map((o) => (o.id === res.data!.id ? res.data! : o))
-                          );
-                          setSelectedOrder(res.data);
-                        } else {
-                          alert(res.error || "Không hủy được đơn");
+                        const res = await api.orders.reorder(selectedOrder.id);
+                        if (!res.success || !res.data) {
+                          alert(res.error || "Không mua lại được");
+                          return;
                         }
+                        const { items, unavailable } = res.data;
+                        if (unavailable.length) {
+                          alert(
+                            `Một số SP không còn: ${unavailable
+                              .map((u) => u.name)
+                              .join(", ")}`
+                          );
+                        }
+                        if (!items.length) return;
+                        for (const it of items) {
+                          const p = {
+                            id: it.productId,
+                            name: it.name,
+                            slug: it.slug,
+                            price: it.price,
+                            image: it.image,
+                            stock: it.maxStock,
+                          } as Product;
+                          addItem(p, it.quantity);
+                        }
+                        router.push("/gio-hang");
                       }}
                     >
-                      Hủy đơn hàng
+                      Mua lại
                     </Button>
                   )}
+                  {isAuthenticated &&
+                    (selectedOrder.status === "pending" ||
+                      selectedOrder.status === "confirmed") &&
+                    selectedOrder.paymentStatus !== "paid" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={async () => {
+                          if (!confirm("Bạn chắc chắn muốn hủy đơn này?")) return;
+                          const res = await api.orders.cancel(selectedOrder.id);
+                          if (res.success && res.data) {
+                            setOrders((prev) =>
+                              prev.map((o) =>
+                                o.id === res.data!.id ? res.data! : o
+                              )
+                            );
+                            setSelectedOrder(res.data);
+                          } else {
+                            alert(res.error || "Không hủy được đơn");
+                          }
+                        }}
+                      >
+                        Hủy đơn hàng
+                      </Button>
+                    )}
+                </div>
                 {isAuthenticated &&
                   selectedOrder.paymentStatus === "paid" &&
                   selectedOrder.status !== "cancelled" &&
