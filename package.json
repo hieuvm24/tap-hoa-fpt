@@ -15,12 +15,6 @@
     "db:sqlite": "tsx scripts/use-db.ts sqlite && prisma generate",
     "db:postgres": "tsx scripts/use-db.ts postgres && prisma generate",
     "check": "tsx scripts/final-check.ts",
-    "db:enrich": "tsx scripts/enrich-catalog.ts",
-    "db:fix-images": "tsx scripts/fix-product-images.ts",
-    "db:expand-300": "tsx scripts/expand-300.ts",
-    "db:rematch-images": "tsx scripts/rematch-off-images.ts",
-    "db:cleanup-names": "tsx scripts/cleanup-product-names.ts",
-    "db:sync-store": "tsx scripts/sync-store-promos.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

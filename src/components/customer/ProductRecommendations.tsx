@@ -141,7 +141,7 @@ export function ProductRecommendations({
     },
     bestsellers: {
       icon: TrendingUp,
-      defaultTitle: "Bán chạy tại quầy",
+      defaultTitle: "Bán chạy nhất cửa hàng",
       subtitle: "Sản phẩm được mua nhiều nhất",
     },
     cart: {
