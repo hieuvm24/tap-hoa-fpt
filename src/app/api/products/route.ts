@@ -96,6 +96,8 @@ export async function GET(req: NextRequest) {
     where.OR = [
       { name: { contains: search, ...mode } },
       { brand: { contains: search, ...mode } },
+      { sku: { contains: search, ...mode } },
+      { slug: { contains: slugQ, ...mode } },
       ...(matchedCatIds.length
         ? [{ categoryId: { in: matchedCatIds } }]
         : []),
@@ -124,7 +126,13 @@ export async function GET(req: NextRequest) {
       ? { price: "asc" as const }
       : sort === "price-desc"
         ? { price: "desc" as const }
-        : { createdAt: "desc" as const };
+        : sort === "sold" || sort === "bestsellers"
+          ? { soldCount: "desc" as const }
+          : sort === "rating"
+            ? { rating: "desc" as const }
+            : sort === "name"
+              ? { name: "asc" as const }
+              : { createdAt: "desc" as const };
 
   const [products, total, brandGroups] = await Promise.all([
     prisma.product.findMany({

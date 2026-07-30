@@ -12,6 +12,8 @@ export function ForgotPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
   const [resetUrl, setResetUrl] = useState("");
+  const [emailed, setEmailed] = useState(false);
+  const [message, setMessage] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +36,8 @@ export function ForgotPasswordForm() {
       return;
     }
     setResetUrl(res.data?.resetUrl || "");
+    setEmailed(Boolean(res.data?.emailed));
+    setMessage(res.data?.message || "");
     setIsSent(true);
   };
 
@@ -43,15 +47,30 @@ export function ForgotPasswordForm() {
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-primary-600 mx-auto mb-4">
           <CheckCircle2 className="h-8 w-8" />
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Yêu cầu đã được tạo</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">
+          {emailed ? "Đã gửi email" : "Yêu cầu đã được tạo"}
+        </h2>
         <p className="text-sm text-gray-500 mb-4">
-          Nếu email <strong className="text-gray-700">{email}</strong> tồn tại trong hệ
-          thống, bạn có thể đặt lại mật khẩu bằng link bên dưới (chế độ demo — chưa gửi
-          SMTP).
+          {message || (
+            <>
+              Nếu email <strong className="text-gray-700">{email}</strong> tồn tại,
+              hãy kiểm tra hộp thư (và mục Spam) để lấy link đặt lại mật khẩu.
+            </>
+          )}
         </p>
+        {emailed && !resetUrl && (
+          <p className="mb-6 text-sm text-primary-700 bg-primary-50 rounded-lg px-3 py-2">
+            Link có hiệu lực trong <strong>1 giờ</strong>. Mở email rồi bấm nút
+            “Đặt lại mật khẩu”.
+          </p>
+        )}
         {resetUrl && (
           <div className="mb-6 rounded-lg bg-gray-50 border p-3 text-left">
-            <p className="text-xs text-gray-500 mb-1">Link đặt lại (demo):</p>
+            <p className="text-xs text-gray-500 mb-1">
+              {emailed
+                ? "Link demo (local) — email cũng đã gửi:"
+                : "Link đặt lại (chế độ demo / chưa cấu hình SMTP):"}
+            </p>
             <a
               href={resetUrl}
               className="text-sm text-primary-600 break-all hover:underline"
@@ -69,9 +88,9 @@ export function ForgotPasswordForm() {
         )}
         <div className="flex flex-col sm:flex-row gap-2 justify-center">
           {resetUrl && (
-            <Link href={resetUrl.replace(/^https?:\/\/[^/]+/, "") || "/dat-lai-mat-khau"}>
+            <a href={resetUrl}>
               <Button>Mở trang đặt lại</Button>
-            </Link>
+            </a>
           )}
           <Link href="/dang-nhap">
             <Button variant="outline" className="gap-2">
@@ -88,8 +107,9 @@ export function ForgotPasswordForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="rounded-xl bg-white p-6 shadow-card border border-gray-100 space-y-4">
         <p className="text-sm text-gray-500">
-          Nhập email đã đăng ký. Hệ thống sẽ tạo link đặt lại mật khẩu (demo hiển thị
-          trực tiếp trên màn hình).
+          Nhập email đã đăng ký. Chúng tôi sẽ gửi link đặt lại mật khẩu (hiệu lực
+          1 giờ). Nếu chưa cấu hình email trên server, hệ thống hiện link demo
+          để làm đồ án.
         </p>
 
         {error && (

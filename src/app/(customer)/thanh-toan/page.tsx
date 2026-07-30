@@ -32,10 +32,16 @@ function CheckoutContent() {
   const [store, setStore] = useState<StoreInfo | null>(null);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const { isAuthenticated, user } = useAuth();
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, clearCart, syncFromServer } = useCart();
   const router = useRouter();
   const searchParams = useSearchParams();
   const voucherCode = searchParams.get("voucher") || "";
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    void syncFromServer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -110,6 +116,35 @@ function CheckoutContent() {
     e.preventDefault();
     if (!items.length) return;
     setIsSubmitting(true);
+
+    const sync = await syncFromServer();
+    if (sync.warnings.length) {
+      const cont = confirm(
+        sync.warnings.join("\n") + "\n\nTiếp tục đặt hàng với giỏ đã cập nhật?"
+      );
+      if (!cont) {
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // Lấy lại snapshot sau sync (state React có thể chưa kịp cập nhật)
+    const validated = await api.cart.validate(
+      items.map((i) => ({ productId: i.productId, quantity: i.quantity }))
+    );
+    const orderItems =
+      validated.success && validated.data
+        ? validated.data.items
+            .filter((i) => !i.removed && i.quantity > 0)
+            .map((i) => ({ productId: i.productId, quantity: i.quantity }))
+        : items.map((i) => ({ productId: i.productId, quantity: i.quantity }));
+
+    if (!orderItems.length) {
+      setIsSubmitting(false);
+      alert("Giỏ hàng trống hoặc hết hàng. Vui lòng chọn lại sản phẩm.");
+      return;
+    }
+
     const res = await api.orders.create({
       customerName,
       customerPhone,
@@ -122,7 +157,7 @@ function CheckoutContent() {
           : paymentMethod,
       fulfillmentType: fulfillment,
       voucherCode: voucherCode || undefined,
-      items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      items: orderItems,
     });
 
     if (!res.success || !res.data) {

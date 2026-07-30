@@ -62,6 +62,67 @@ const PRESETS = [
   { id: "year", label: "Năm nay" },
 ] as const;
 
+/** Gộp doanh thu theo tuần — dùng khi kỳ dài (năm / > 45 ngày) */
+function aggregateByWeek(daily: ChartData[]): ChartData[] {
+  const weeks: ChartData[] = [];
+  for (let i = 0; i < daily.length; i += 7) {
+    const chunk = daily.slice(i, i + 7);
+    const value = chunk.reduce((s, d) => s + d.value, 0);
+    const start = chunk[0]?.label || `T${weeks.length + 1}`;
+    weeks.push({ label: start, value });
+  }
+  return weeks;
+}
+
+function prepareTrendChart(
+  daily: ChartData[],
+  preset: string
+): {
+  title: string;
+  note?: string;
+  data: ChartData[];
+  showMonthly: boolean;
+} {
+  if (preset === "year") {
+    return {
+      title: "Doanh thu theo tuần",
+      note: "Kỳ năm — gộp theo tuần để dễ đọc. Chi tiết tháng ở biểu đồ bên dưới.",
+      data: aggregateByWeek(daily),
+      showMonthly: true,
+    };
+  }
+  if (daily.length > 45) {
+    return {
+      title: "Doanh thu theo tuần",
+      note: "Kỳ dài — đã gộp theo tuần.",
+      data: aggregateByWeek(daily),
+      showMonthly: true,
+    };
+  }
+  if (daily.length > 31) {
+    return {
+      title: "Doanh thu theo ngày",
+      note: "Vuốt ngang biểu đồ nếu không thấy hết ngày.",
+      data: daily.map((d) => ({
+        ...d,
+        label: d.label.includes("-") ? d.label.split("-")[1] : d.label,
+      })),
+      showMonthly: true,
+    };
+  }
+  return {
+    title: "Doanh thu theo ngày",
+    data: daily.map((d) => ({
+      ...d,
+      label:
+        daily.length > 14 && d.label.includes("-")
+          ? d.label.split("-")[1]
+          : d.label,
+    })),
+    showMonthly: preset !== "7d",
+  };
+}
+
 function ChangePill({ value }: { value: number }) {
   return (
     <span
@@ -101,10 +162,10 @@ export default function AdminReportsPage() {
   }
 
   const s = data.summary;
-  const dailyChart =
-    data.dailyRevenue.length > 45
-      ? data.dailyRevenue.filter((_, i) => i % 2 === 0)
-      : data.dailyRevenue;
+  const trend = prepareTrendChart(
+    data.dailyRevenue,
+    data.range.preset || preset
+  );
 
   return (
     <div>
@@ -237,21 +298,21 @@ export default function AdminReportsPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="lg:col-span-2">
-          <CardTitle className="mb-4">Doanh thu theo ngày</CardTitle>
-          {data.dailyRevenue.length > 45 && (
-            <p className="mb-2 text-xs text-gray-400">
-              Biểu đồ rút gọn — xem doanh thu theo tháng bên dưới.
-            </p>
+          <CardTitle className="mb-1">{trend.title}</CardTitle>
+          {trend.note && (
+            <p className="mb-3 text-xs text-gray-400">{trend.note}</p>
           )}
-          <BarChart data={dailyChart} valueFormat="millions" />
+          <BarChart data={trend.data} valueFormat="millions" />
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardTitle className="mb-4">
-            Doanh thu theo tháng ({new Date().getFullYear()})
-          </CardTitle>
-          <BarChart data={data.monthlyRevenue} valueFormat="millions" />
-        </Card>
+        {trend.showMonthly && (
+          <Card className="lg:col-span-2">
+            <CardTitle className="mb-4">
+              Doanh thu theo tháng ({new Date().getFullYear()})
+            </CardTitle>
+            <BarChart data={data.monthlyRevenue} valueFormat="millions" />
+          </Card>
+        )}
 
         <Card>
           <CardTitle className="mb-4">Online vs tại quầy</CardTitle>

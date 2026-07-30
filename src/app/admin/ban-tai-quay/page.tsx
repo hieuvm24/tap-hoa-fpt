@@ -18,7 +18,8 @@ export default function PosPage() {
   const [results, setResults] = useState<Product[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [customerName, setCustomerName] = useState("Khách lẻ");
-  const [customerPhone, setCustomerPhone] = useState("0000000000");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [matchedCustomer, setMatchedCustomer] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "transfer">("cod");
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -45,6 +46,30 @@ export default function PosPage() {
     }, 250);
     return () => clearTimeout(t);
   }, [query]);
+
+  // Tra cứu khách theo SĐT
+  useEffect(() => {
+    const digits = customerPhone.replace(/\D/g, "");
+    if (digits.length < 9) {
+      setMatchedCustomer(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      api.customers.lookupByPhone(digits).then((res) => {
+        if (res.success && res.data?.customer) {
+          const c = res.data.customer;
+          setMatchedCustomer(c.name);
+          if (!customerName || customerName === "Khách lẻ") {
+            setCustomerName(c.name);
+          }
+        } else {
+          setMatchedCustomer(null);
+        }
+      });
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerPhone]);
 
   const subtotal = useMemo(
     () => lines.reduce((s, l) => s + l.product.price * l.quantity, 0),
@@ -80,14 +105,15 @@ export default function PosPage() {
 
   const checkout = async () => {
     if (!lines.length) return;
-    if (!customerName.trim() || !customerPhone.trim()) {
-      alert("Nhập tên và SĐT khách (hoặc giữ Khách lẻ)");
+    const phone = customerPhone.trim() || "0000000000";
+    if (!customerName.trim()) {
+      alert("Nhập tên khách (hoặc giữ Khách lẻ)");
       return;
     }
     setSubmitting(true);
     const res = await api.orders.create({
       customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
+      customerPhone: phone,
       address: "Tại quầy",
       paymentMethod,
       fulfillmentType: "pickup",
@@ -105,7 +131,8 @@ export default function PosPage() {
     setLastOrder(res.data.orderCode);
     setLines([]);
     setCustomerName("Khách lẻ");
-    setCustomerPhone("0000000000");
+    setCustomerPhone("");
+    setMatchedCustomer(null);
   };
 
   return (
@@ -131,7 +158,7 @@ export default function PosPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm tên / thương hiệu sản phẩm..."
+              placeholder="Tìm tên / SKU / thương hiệu..."
               className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
             />
           </div>
@@ -148,6 +175,7 @@ export default function PosPage() {
                   <Image src={p.image} alt={p.name} fill className="object-cover" />
                 </div>
                 <p className="text-sm font-medium line-clamp-2 min-h-[2.5rem]">{p.name}</p>
+                <p className="text-[10px] text-gray-400 truncate">{p.sku}</p>
                 <div className="mt-1 flex items-center justify-between text-xs">
                   <span className="font-semibold text-primary-600">
                     {formatPrice(p.price)}
@@ -167,11 +195,19 @@ export default function PosPage() {
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
             />
-            <Input
-              label="SĐT"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-            />
+            <div>
+              <Input
+                label="SĐT"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="09..."
+              />
+              {matchedCustomer && (
+                <p className="mt-1 text-xs text-emerald-600">
+                  Khớp KH: {matchedCustomer} — đơn sẽ gắn vào tài khoản
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             <button

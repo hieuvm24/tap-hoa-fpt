@@ -15,11 +15,22 @@ import { ProductRecommendations } from "@/components/customer";
 function CartPageContent() {
   const searchParams = useSearchParams();
   const voucherFromUrl = searchParams.get("voucher") || "";
-  const { items, updateQuantity, removeItem, subtotal } = useCart();
+  const { items, updateQuantity, removeItem, subtotal, syncFromServer } =
+    useCart();
   const [voucher, setVoucher] = useState(voucherFromUrl);
   const [appliedVoucher, setAppliedVoucher] = useState("");
   const [discount, setDiscount] = useState(0);
   const [voucherError, setVoucherError] = useState("");
+  const [syncNotes, setSyncNotes] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    void syncFromServer().then((r) => {
+      if (r.warnings.length) setSyncNotes(r.warnings);
+    });
+    // chỉ sync khi vào trang
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const shippingFee = subtotal >= FREE_SHIP_THRESHOLD ? 0 : SHIPPING_FEE;
   const total = subtotal + shippingFee - discount;
@@ -50,6 +61,14 @@ function CartPageContent() {
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Giỏ hàng</h1>
+
+      {syncNotes.length > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {syncNotes.map((n) => (
+            <p key={n}>{n}</p>
+          ))}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div>

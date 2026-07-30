@@ -2,11 +2,21 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { mapProduct, mapPromotion, apiSuccess, apiError } from "@/lib/mappers";
 import { generateAiReply } from "@/lib/ai";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const message = String(body.message || "").trim();
   if (!message) return apiError("Thiếu nội dung tin nhắn");
+
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+  const rl = rateLimit(`ai:ip:${ip}`, 40, 15 * 60 * 1000);
+  if (!rl.ok) {
+    return apiError("Bạn hỏi quá nhanh. Thử lại sau ít phút.", 429);
+  }
 
   const history = Array.isArray(body.history)
     ? body.history

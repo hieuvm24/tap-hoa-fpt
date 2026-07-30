@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { createToken, setAuthCookie, hashPassword } from "@/lib/auth-server";
 import { apiSuccess, apiError } from "@/lib/mappers";
+import { rateLimit } from "@/lib/rate-limit";
 
 function toAuthUser(user: {
   id: string;
@@ -37,6 +38,15 @@ export async function POST(req: NextRequest) {
 
     if (!/^0\d{9}$/.test(phone.replace(/\s/g, ""))) {
       return apiError("Số điện thoại không hợp lệ (10 số, bắt đầu 0)");
+    }
+
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+    const rl = rateLimit(`register:ip:${ip}`, 8, 60 * 60 * 1000);
+    if (!rl.ok) {
+      return apiError("Đăng ký quá nhiều lần. Thử lại sau.", 429);
     }
 
     const existing = await prisma.user.findUnique({

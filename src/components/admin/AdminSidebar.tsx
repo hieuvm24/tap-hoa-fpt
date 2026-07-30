@@ -19,6 +19,7 @@ import {
   MessagesSquare,
   Star,
   UserCog,
+  Home,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -67,11 +68,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 h-full w-64 bg-gray-900 text-white transition-transform duration-300 lg:translate-x-0",
+          "fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-gray-900 text-white transition-transform duration-300 lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-gray-800 px-4">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-800 px-4">
           <Link href="/admin" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500">
               <Store className="h-4 w-4" />
@@ -94,7 +95,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           </button>
         </div>
 
-        <nav className="space-y-1 p-3">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {visibleItems.map((item) => {
             const Icon = iconByHref[item.href] || Package;
             const isActive =
@@ -114,26 +115,28 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                     : "text-gray-400 hover:bg-gray-800 hover:text-white"
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5 shrink-0" />
                 {item.label}
               </Link>
             );
           })}
+
+          {role === "STAFF" && (
+            <p className="px-1 pt-3 text-[11px] leading-relaxed text-gray-500">
+              Nhân viên xử lý đơn, kho hàng và khách. Báo cáo / khuyến mãi / cài
+              đặt do chủ cửa hàng quản lý.
+            </p>
+          )}
         </nav>
 
-        {role === "STAFF" && (
-          <p className="px-4 text-[11px] leading-relaxed text-gray-500">
-            Nhân viên xử lý đơn, kho hàng và khách. Báo cáo / khuyến mãi / cài
-            đặt do chủ cửa hàng quản lý.
-          </p>
-        )}
-
-        <div className="absolute bottom-4 left-0 right-0 px-4">
+        <div className="shrink-0 border-t border-gray-800 p-3">
           <Link
             href="/"
-            className="flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+            onClick={onClose}
+            className="flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2.5 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
           >
-            ← Về trang chủ
+            <Home className="h-4 w-4" />
+            Về trang chủ
           </Link>
         </div>
       </aside>

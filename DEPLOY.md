@@ -113,6 +113,10 @@ Kiểm tra trên GitHub: thấy code, **không** thấy `.env`.
 | `CLOUDINARY_CLOUD_NAME` | Cloud name Bước 2 | |
 | `CLOUDINARY_API_KEY` | API Key Bước 2 | |
 | `CLOUDINARY_API_SECRET` | API Secret Bước 2 | |
+| `RESEND_API_KEY` | Key từ [resend.com](https://resend.com) | Quên mật khẩu (khuyên dùng) |
+| `MAIL_FROM` | VD `Tạp Hóa FPT <onboarding@resend.dev>` | Tuỳ chọn |
+
+Hoặc thay Resend bằng SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`.
 
 Chọn môi trường: tích **Production**, **Preview**, **Development** (hoặc ít nhất Production).
 

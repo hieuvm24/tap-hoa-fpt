@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Sparkles, ShoppingBag, Eye, TrendingUp, PackagePlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Sparkles,
+  ShoppingBag,
+  Eye,
+  TrendingUp,
+  PackagePlus,
+} from "lucide-react";
 import { Product } from "@/types";
 import {
   getSimilarProducts,
@@ -32,6 +38,8 @@ interface ProductRecommendationsProps {
   title?: string;
   limit?: number;
   className?: string;
+  /** Ẩn subtitle lý do gợi ý */
+  hideReasons?: boolean;
 }
 
 export function ProductRecommendations({
@@ -41,12 +49,19 @@ export function ProductRecommendations({
   title,
   limit = 4,
   className,
+  hideReasons = false,
 }: ProductRecommendationsProps) {
   const [items, setItems] = useState<Product[]>([]);
+  const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [source, setSource] = useState<string>("");
   const [allProducts, setAllProducts] = useState<Product[]>([]);
 
+  const cartKey = useMemo(
+    () => (cartProductIds || []).join(","),
+    [cartProductIds]
+  );
+
   useEffect(() => {
-    // Fallback client chỉ khi API recommendations lỗi — tải vừa đủ
     api.products.list({ limit: "80", sort: "sold" }).then((res) => {
       if (res.success && res.data) {
         const list = Array.isArray(res.data) ? res.data : res.data.products;
@@ -64,15 +79,26 @@ export function ProductRecommendations({
       const ids = recentIds.filter((id) => id !== product?.id).slice(0, limit);
       if (ids.length === 0) {
         setItems([]);
+        setReasons({});
         return;
       }
-      api.products.byIds(ids).then((res) => {
-        if (res.success && res.data?.products) {
-          setItems(res.data.products);
-        } else if (allProducts.length) {
-          setItems(getRecentlyViewed(allProducts, product?.id).slice(0, limit));
-        }
-      });
+      api.recommendations
+        .get({
+          type: "recent",
+          recentIds: ids.join(","),
+          limit: String(limit),
+          ...(product?.id ? { productId: product.id } : {}),
+        })
+        .then((res) => {
+          if (res.success && res.data?.products?.length) {
+            setItems(res.data.products);
+            setSource(res.data.source || "content");
+            setReasons(res.data.reasons || {});
+          } else if (allProducts.length) {
+            setItems(getRecentlyViewed(allProducts, product?.id).slice(0, limit));
+            setSource("content");
+          }
+        });
       return;
     }
 
@@ -95,9 +121,13 @@ export function ProductRecommendations({
       params.cartIds = cartProductIds.join(",");
     }
 
+    let cancelled = false;
     api.recommendations.get(params).then((res) => {
+      if (cancelled) return;
       if (res.success && res.data?.products?.length) {
         setItems(res.data.products);
+        setSource(res.data.source || "");
+        setReasons(res.data.reasons || {});
         return;
       }
       if (!allProducts.length) return;
@@ -121,11 +151,21 @@ export function ProductRecommendations({
           break;
         }
         default:
-          result = getPersonalizedRecommendations(allProducts, limit);
+          result = getPersonalizedRecommendations(
+            allProducts,
+            limit,
+            recentIds
+          );
       }
       setItems(result);
+      setSource("content");
+      setReasons({});
     });
-  }, [product, variant, limit, allProducts, cartProductIds]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product, variant, limit, allProducts, cartKey, cartProductIds]);
 
   if (items.length === 0) return null;
 
@@ -133,17 +173,17 @@ export function ProductRecommendations({
     similar: {
       icon: Sparkles,
       defaultTitle: "Sản phẩm tương tự",
-      subtitle: "Gợi ý theo danh mục, giá và đánh giá",
+      subtitle: "Theo danh mục, giá và hành vi mua hàng",
     },
     "bought-together": {
       icon: ShoppingBag,
       defaultTitle: "Thường mua kèm",
-      subtitle: "Dựa trên đơn hàng thực tế & thói quen mua sắm",
+      subtitle: "Từ đơn hàng thực tế & thói quen mua sắm tạp hóa",
     },
     personalized: {
       icon: Sparkles,
       defaultTitle: "Gợi ý dành cho bạn",
-      subtitle: "Dựa trên sản phẩm bạn đã xem",
+      subtitle: "Dựa trên đã xem, đã mua và sản phẩm yêu thích",
     },
     recent: {
       icon: Eye,
@@ -153,7 +193,7 @@ export function ProductRecommendations({
     bestsellers: {
       icon: TrendingUp,
       defaultTitle: "Bán chạy nhất cửa hàng",
-      subtitle: "Sản phẩm được mua nhiều nhất",
+      subtitle: "Kết hợp doanh số tổng & xu hướng 14 ngày gần đây",
     },
     cart: {
       icon: PackagePlus,
@@ -163,21 +203,41 @@ export function ProductRecommendations({
   }[variant];
 
   const Icon = config.icon;
+  const sourceLabel =
+    source === "hybrid"
+      ? "Hybrid"
+      : source === "orders"
+        ? "Đơn hàng"
+        : source === "popularity"
+          ? "Xu hướng"
+          : null;
 
   return (
     <section className={className ?? "py-8"}>
       <div className="mb-6">
-        <div className="mb-1 flex items-center gap-2">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
           <Icon className="h-5 w-5 text-primary-500" />
           <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
             {title || config.defaultTitle}
           </h2>
+          {sourceLabel && (
+            <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
+              {sourceLabel}
+            </span>
+          )}
         </div>
         <p className="text-sm text-gray-500">{config.subtitle}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
         {items.map((p) => (
-          <ProductCard key={p.id} product={p} />
+          <div key={p.id} className="min-w-0">
+            <ProductCard product={p} />
+            {!hideReasons && reasons[p.id] && (
+              <p className="mt-1.5 line-clamp-1 px-0.5 text-[11px] text-gray-400">
+                {reasons[p.id]}
+              </p>
+            )}
+          </div>
         ))}
       </div>
     </section>

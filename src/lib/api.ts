@@ -25,6 +25,29 @@ export const api = {
       timestamp: string;
     }>("/health"),
 
+  cart: {
+    validate: (items: { productId: string; quantity: number }[]) =>
+      request<{
+        items: {
+          productId: string;
+          available: boolean;
+          quantity: number;
+          stock: number;
+          price: number;
+          name?: string;
+          slug?: string;
+          image?: string;
+          categorySlug?: string;
+          removed?: boolean;
+        }[];
+        warnings: string[];
+        ok: boolean;
+      }>("/cart/validate", {
+        method: "POST",
+        body: JSON.stringify({ items }),
+      }),
+  },
+
   upload: async (
     file: File,
     folder: "products" | "avatars" | "news" | "promotions" = "products"
@@ -310,7 +333,10 @@ export const api = {
       const qs = params ? "?" + new URLSearchParams(params).toString() : "";
       return request<{
         type: string;
+        source?: string;
         products: import("@/types").Product[];
+        reasons?: Record<string, string>;
+        meta?: Record<string, unknown>;
       }>(`/recommendations${qs}`);
     },
   },
@@ -459,9 +485,11 @@ export const api = {
     request: (email: string) =>
       request<{
         sent: boolean;
+        emailed?: boolean;
+        demo?: boolean;
         message: string;
         resetUrl?: string;
-        demo?: boolean;
+        mailError?: string;
       }>("/auth/forgot-password", {
         method: "POST",
         body: JSON.stringify({ email }),
@@ -487,6 +515,16 @@ export const api = {
           }
       >(`/customers${qs}`);
     },
+    lookupByPhone: (phone: string) =>
+      request<{
+        customer: {
+          id: string;
+          name: string;
+          email: string;
+          phone?: string;
+          avatar?: string;
+        } | null;
+      }>(`/customers/lookup?phone=${encodeURIComponent(phone)}`),
     get: (id: string) =>
       request<
         import("@/types").Customer & {

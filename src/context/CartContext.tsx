@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Product } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 
 const LEGACY_CART_KEY = "taphoa_cart";
 const GUEST_CART_KEY = "taphoa_cart_guest";
@@ -34,6 +35,8 @@ interface CartContextValue {
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  /** Đồng bộ giá/tồn từ server trước thanh toán */
+  syncFromServer: () => Promise<{ ok: boolean; warnings: string[] }>;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -169,6 +172,35 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
+  const syncFromServer = useCallback(async () => {
+    if (items.length === 0) return { ok: true, warnings: [] as string[] };
+    const res = await api.cart.validate(
+      items.map((i) => ({ productId: i.productId, quantity: i.quantity }))
+    );
+    if (!res.success || !res.data) {
+      return {
+        ok: false,
+        warnings: [res.error || "Không kiểm tra được tồn kho"],
+      };
+    }
+    const next: CartItem[] = [];
+    for (const row of res.data.items) {
+      if (row.removed || row.quantity <= 0 || !row.available) continue;
+      next.push({
+        productId: row.productId,
+        slug: row.slug || "",
+        name: row.name || "",
+        price: row.price,
+        image: row.image || "",
+        stock: row.stock,
+        quantity: row.quantity,
+        categorySlug: row.categorySlug,
+      });
+    }
+    setItems(next);
+    return { ok: res.data.ok, warnings: res.data.warnings };
+  }, [items]);
+
   const itemCount = items.reduce((s, i) => s + i.quantity, 0);
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
@@ -181,8 +213,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeItem,
       updateQuantity,
       clearCart,
+      syncFromServer,
     }),
-    [items, itemCount, subtotal, addItem, removeItem, updateQuantity, clearCart]
+    [
+      items,
+      itemCount,
+      subtotal,
+      addItem,
+      removeItem,
+      updateQuantity,
+      clearCart,
+      syncFromServer,
+    ]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

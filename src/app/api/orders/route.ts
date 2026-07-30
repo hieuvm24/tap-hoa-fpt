@@ -4,6 +4,7 @@ import { getSession, isAdminRole } from "@/lib/auth-server";
 import { mapOrder, apiSuccess, apiError } from "@/lib/mappers";
 import { FREE_SHIP_THRESHOLD, SHIPPING_FEE, DEFAULT_STORE } from "@/config/defaults";
 import { calcPromotionDiscount } from "@/lib/promotions";
+import { invalidateCoPurchaseCache } from "@/lib/recommendations";
 
 const orderInclude = {
   items: { include: { product: true } },
@@ -252,6 +253,24 @@ export async function POST(req: NextRequest) {
     promoLabels.length ? `KM: ${promoLabels.join("; ")}` : null,
   ].filter(Boolean);
 
+  // Walk-in: gắn đơn vào tài khoản khách nếu SĐT trùng (lịch sử mua)
+  let walkInUserId: string | undefined;
+  if (isWalkIn) {
+    const digits = String(customerPhone).replace(/\D/g, "");
+    const tail = digits.slice(-9);
+    if (tail.length >= 9) {
+      const candidates = await prisma.user.findMany({
+        where: { role: "CUSTOMER", phone: { not: null } },
+        select: { id: true, phone: true, name: true },
+        take: 300,
+      });
+      const matched = candidates.find((u) =>
+        (u.phone || "").replace(/\D/g, "").endsWith(tail)
+      );
+      if (matched) walkInUserId = matched.id;
+    }
+  }
+
   // Chong dat trung khi doi mang / bam 2 lan: cung user, cung tong, trong 90s
   if (session?.userId && !isWalkIn) {
     const recent = await prisma.order.findFirst({
@@ -322,7 +341,7 @@ export async function POST(req: NextRequest) {
       return tx.order.create({
         data: {
           orderCode,
-          userId: isWalkIn ? undefined : session?.userId,
+          userId: isWalkIn ? walkInUserId : session?.userId,
           customerName,
           customerPhone,
           customerEmail,
@@ -344,6 +363,7 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    invalidateCoPurchaseCache();
     return apiSuccess(mapOrder(order), 201);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Không tạo được đơn hàng";
