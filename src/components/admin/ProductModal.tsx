@@ -51,7 +51,7 @@ export function ProductModal({ isOpen, onClose, product, onSaved }: ProductModal
         description: product.description,
         brand: product.brand,
         image: product.image,
-        isFeatured: product.isFeatured,
+        isFeatured: !!product.isFeatured,
       });
     } else {
       setForm({

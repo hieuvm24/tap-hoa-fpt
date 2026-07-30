@@ -27,13 +27,15 @@ export async function GET(req: NextRequest) {
     ];
   }
 
+  const skip = paginate ? (page - 1) * limit : 0;
+  const take = paginate ? limit : 500;
+
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      ...(paginate
-        ? { skip: (page - 1) * limit, take: limit }
-        : { take: 500 }),
+      skip,
+      take,
     }),
     prisma.user.count({ where }),
   ]);
