@@ -1,4 +1,4 @@
-﻿import { PrismaClient } from "@prisma/client";
+﻿import { PrismaClient, type User } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -77,6 +77,8 @@ async function syncProductRating(productId: string) {
 async function main() {
   console.log("Seeding database...");
 
+  await prisma.supportMessage.deleteMany();
+  await prisma.supportThread.deleteMany();
   await prisma.orderTimeline.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
@@ -126,7 +128,7 @@ async function main() {
     { email: "duc.ton@demo.com", name: "Tôn Văn Đức", phone: "0920123458" },
   ];
 
-  const customers = [];
+  const customers: User[] = [];
   for (let i = 0; i < customersDataVi.length; i++) {
     const c = customersDataVi[i];
     const created = await prisma.user.create({
@@ -233,8 +235,14 @@ async function main() {
     ],
   });
 
-  await prisma.voucher.create({
-    data: { code: "TAPHOA10", discount: 10, minOrder: 100000, isActive: true },
+  await prisma.voucher.createMany({
+    data: [
+      { code: "TAPHOA10", discount: 10, minOrder: 100000, isActive: true },
+      { code: "DEMO20", discount: 20, minOrder: 150000, isActive: true },
+      { code: "FREESHIP", discount: 15, minOrder: 200000, isActive: true },
+      { code: "WELCOME", discount: 5, minOrder: 50000, isActive: true },
+      { code: "HETHAN", discount: 30, minOrder: 0, isActive: false },
+    ],
   });
 
   const categoriesData = [
@@ -352,7 +360,7 @@ async function main() {
     "Giao đúng hẹn, cảm ơn shop.",
   ];
 
-  // Tao danh gia that: moi san pham 2-5 review tu khach hang khac nhau
+  // Tao danh gia that: moi SP 2-5 review, mỗi user chỉ 1 lần / SP
   const reviewsToCreate: {
     customerName: string;
     rating: number;
@@ -361,21 +369,27 @@ async function main() {
     userId: string;
     avatar: string | null;
   }[] = [];
+  const reviewPair = new Set<string>();
 
   for (let i = 0; i < productIdList.length; i++) {
     const productId = productIdList[i];
     const reviewCount = 2 + (i % 4); // 2, 3, 4, 5
-    for (let j = 0; j < reviewCount; j++) {
-      const customer = customers[(i * 3 + j * 5) % customers.length];
-      const star = 3 + ((i + j * 2) % 3); // 3, 4, 5
+    let added = 0;
+    for (let j = 0; added < reviewCount && j < customers.length * 2; j++) {
+      const customer = customers[(i + j * 3) % customers.length];
+      const key = `${customer.id}:${productId}`;
+      if (reviewPair.has(key)) continue;
+      reviewPair.add(key);
+      const star = 3 + ((i + added * 2) % 3); // 3, 4, 5
       reviewsToCreate.push({
         customerName: customer.name,
         rating: star,
-        comment: reviewComments[(i + j) % reviewComments.length],
+        comment: reviewComments[(i + added) % reviewComments.length],
         productId,
         userId: customer.id,
         avatar: customer.avatar,
       });
+      added += 1;
     }
   }
 
@@ -418,143 +432,513 @@ async function main() {
     ],
   });
 
-  await prisma.order.create({
-    data: {
-      orderCode: "DH001234",
-      userId: customers[0].id,
-      customerName: customers[0].name,
-      customerPhone: customers[0].phone!,
-      customerEmail: customers[0].email,
-      subtotal: 48000,
-      shippingFee: 15000,
-      discount: 0,
-      total: 63000,
+  // --- Demo data: tồn thấp, wishlist, đơn hàng co-purchase, support ---
+  type ProductMeta = {
+    id: string;
+    name: string;
+    price: number;
+    image: string;
+  };
+  const productBySlug = await prisma.product.findMany();
+  const productMeta: Record<string, ProductMeta> = {};
+  for (const p of productBySlug) {
+    productMeta[p.slug] = {
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      image: p.image,
+    };
+  }
+
+  // Tồn thấp để demo cảnh báo admin
+  await prisma.product.update({
+    where: { id: productIds["nho-xanh-khong-hat"] },
+    data: { stock: 3 },
+  });
+  await prisma.product.update({
+    where: { id: productIds["ha-cao-tom-thit"] },
+    data: { stock: 4 },
+  });
+  await prisma.product.update({
+    where: { id: productIds["sua-bot-milo-400g"] },
+    data: { stock: 5 },
+  });
+
+  // Wishlist khách demo — personalization / trang yêu thích
+  await prisma.wishlistItem.createMany({
+    data: [
+      { userId: customers[0].id, productId: productIds["sua-tuoi-vinamilk-1l"] },
+      { userId: customers[0].id, productId: productIds["banh-oreo-133g"] },
+      { userId: customers[0].id, productId: productIds["cam-sanh-ha-giang"] },
+      { userId: customers[1].id, productId: productIds["mi-hao-hao-tom-chua-cay"] },
+      { userId: customers[1].id, productId: productIds["coca-cola-330ml"] },
+      { userId: customers[2].id, productId: productIds["xuc-xich-cp-500g"] },
+    ],
+  });
+
+  /**
+   * Giỏ hàng mẫu — lặp nhiều lần để recommendation "Thường mua kèm" rõ khi demo:
+   * - Mì ↔ Coca / Snack
+   * - Rau ↔ Nước mắm / Dầu ăn
+   * - Sữa ↔ Bánh / Sữa chua
+   * - Đông lạnh ↔ Mì / Gia vị
+   */
+  type Line = { slug: string; qty: number };
+  const baskets: { name: string; lines: Line[]; weight: number }[] = [
+    {
+      name: "an-vat",
+      weight: 18,
+      lines: [
+        { slug: "mi-hao-hao-tom-chua-cay", qty: 5 },
+        { slug: "coca-cola-330ml", qty: 2 },
+        { slug: "snack-oishi-40g", qty: 3 },
+      ],
+    },
+    {
+      name: "an-vat-2",
+      weight: 12,
+      lines: [
+        { slug: "mi-omachi-sot-bo-ham", qty: 3 },
+        { slug: "sting-do-330ml", qty: 2 },
+        { slug: "banh-oreo-133g", qty: 1 },
+      ],
+    },
+    {
+      name: "nau-an",
+      weight: 16,
+      lines: [
+        { slug: "rau-muong-sach-da-lat", qty: 2 },
+        { slug: "nuoc-mam-nam-ngu-750ml", qty: 1 },
+        { slug: "dau-an-neptune-1l", qty: 1 },
+      ],
+    },
+    {
+      name: "nau-an-2",
+      weight: 10,
+      lines: [
+        { slug: "ca-chua-bi-da-lat", qty: 1 },
+        { slug: "ca-rot-baby-500g", qty: 1 },
+        { slug: "hat-nem-knorr-400g", qty: 1 },
+        { slug: "tuong-ot-cholimex", qty: 1 },
+      ],
+    },
+    {
+      name: "sua-banh",
+      weight: 14,
+      lines: [
+        { slug: "sua-tuoi-vinamilk-1l", qty: 2 },
+        { slug: "banh-oreo-133g", qty: 1 },
+        { slug: "sua-chua-vinamilk-loc-4", qty: 2 },
+      ],
+    },
+    {
+      name: "sua-trai-cay",
+      weight: 8,
+      lines: [
+        { slug: "sua-th-true-milk-1l", qty: 1 },
+        { slug: "cam-sanh-ha-giang", qty: 1 },
+        { slug: "chuoi-su-tieu", qty: 1 },
+      ],
+    },
+    {
+      name: "dong-lanh",
+      weight: 12,
+      lines: [
+        { slug: "xuc-xich-cp-500g", qty: 1 },
+        { slug: "mi-hao-hao-tom-chua-cay", qty: 4 },
+        { slug: "nuoc-mam-nam-ngu-750ml", qty: 1 },
+      ],
+    },
+    {
+      name: "dong-lanh-2",
+      weight: 8,
+      lines: [
+        { slug: "ca-vien-chi-town", qty: 1 },
+        { slug: "cha-gio-tom-thit", qty: 1 },
+        { slug: "tra-xanh-0-do", qty: 2 },
+      ],
+    },
+    {
+      name: "do-uong-banh",
+      weight: 10,
+      lines: [
+        { slug: "pepsi-15l", qty: 1 },
+        { slug: "banh-choco-pie-12", qty: 1 },
+        { slug: "keo-alpenliebe-120g", qty: 1 },
+      ],
+    },
+    {
+      name: "gia-dinh",
+      weight: 10,
+      lines: [
+        { slug: "khoai-tay-da-lat-1kg", qty: 1 },
+        { slug: "duong-trang-bien-hoa-1kg", qty: 1 },
+        { slug: "muoi-i-ot-visaco", qty: 1 },
+        { slug: "nuoc-suoi-lavie-15l", qty: 2 },
+      ],
+    },
+  ];
+
+  const weightedBaskets: typeof baskets = [];
+  for (const b of baskets) {
+    for (let w = 0; w < b.weight; w++) weightedBaskets.push(b);
+  }
+
+  const statusesFlow: {
+    status: string;
+    paymentStatus: string;
+    paymentMethod: string;
+    steps: { status: string; note?: string }[];
+  }[] = [
+    {
       status: "delivered",
-      paymentMethod: "cod",
       paymentStatus: "paid",
-      address: sampleAddresses[0],
-      items: {
-        create: [
-          { productId: productIds["rau-muong-sach-da-lat"], quantity: 2, price: 12000, productName: "Rau muống sạch Đà Lạt", productImage: productImages.rau },
-          { productId: productIds["nuoc-suoi-lavie-15l"], quantity: 3, price: 8000, productName: "Nước suối Lavie 1.5L", productImage: productImages.doUong },
-        ],
-      },
-      timeline: {
-        create: [
-          { status: "pending", note: "Đơn hàng đã được đặt" },
-          { status: "confirmed" },
-          { status: "shipping" },
-          { status: "delivered", note: "Giao hàng thành công" },
-        ],
-      },
-    },
-  });
-
-  await prisma.order.create({
-    data: {
-      orderCode: "DH001235",
-      userId: customers[1].id,
-      customerName: customers[1].name,
-      customerPhone: customers[1].phone!,
-      customerEmail: customers[1].email,
-      subtotal: 100000,
-      shippingFee: 15000,
-      discount: 10000,
-      total: 105000,
-      status: "shipping",
       paymentMethod: "cod",
-      paymentStatus: "pending",
-      address: sampleAddresses[1],
-      voucherCode: "TAPHOA10",
-      items: {
-        create: [
-          { productId: productIds["sua-tuoi-vinamilk-1l"], quantity: 2, price: 32000, productName: "Sữa tươi Vinamilk 1L", productImage: productImages.sua },
-          { productId: productIds["mi-hao-hao-tom-chua-cay"], quantity: 8, price: 4500, productName: "Mì Hảo Hảo tôm chua cay", productImage: productImages.miGoi },
-        ],
-      },
-      timeline: {
-        create: [
-          { status: "pending", note: "Đơn hàng đã được đặt" },
-          { status: "confirmed" },
-          { status: "shipping", note: "Đang giao hàng" },
-        ],
-      },
+      steps: [
+        { status: "pending", note: "Đơn hàng đã được đặt" },
+        { status: "confirmed" },
+        { status: "shipping" },
+        { status: "delivered", note: "Giao hàng thành công" },
+      ],
     },
-  });
-
-  await prisma.order.create({
-    data: {
-      orderCode: "DH001236",
-      userId: customers[2].id,
-      customerName: customers[2].name,
-      customerPhone: customers[2].phone!,
-      customerEmail: customers[2].email,
-      subtotal: 124000,
-      shippingFee: 0,
-      discount: 0,
-      total: 124000,
-      status: "pending",
+    {
+      status: "delivered",
+      paymentStatus: "paid",
       paymentMethod: "vnpay",
-      paymentStatus: "pending",
-      address: sampleAddresses[2],
-      items: {
-        create: [
-          { productId: productIds["xoai-cat-hoa-loc"], quantity: 1, price: 55000, productName: "Xoài cát Hòa Lộc", productImage: productImages.traiCay },
-          { productId: productIds["dau-an-neptune-1l"], quantity: 1, price: 45000, productName: "Dầu ăn Neptune 1L", productImage: productImages.giaVi },
-          { productId: productIds["banh-oreo-133g"], quantity: 1, price: 22000, productName: "Bánh Oreo 133g", productImage: productImages.banhKeo },
-        ],
-      },
-      timeline: {
-        create: [{ status: "pending", note: "Đơn hàng đã được đặt" }],
-      },
+      steps: [
+        { status: "pending", note: "Đơn hàng đã được đặt" },
+        { status: "confirmed" },
+        { status: "shipping" },
+        { status: "delivered", note: "Thanh toán VNPay thành công" },
+      ],
     },
+    {
+      status: "shipping",
+      paymentStatus: "pending",
+      paymentMethod: "cod",
+      steps: [
+        { status: "pending", note: "Đơn hàng đã được đặt" },
+        { status: "confirmed" },
+        { status: "shipping", note: "Đang giao hàng" },
+      ],
+    },
+    {
+      status: "confirmed",
+      paymentStatus: "pending",
+      paymentMethod: "cod",
+      steps: [
+        { status: "pending", note: "Đơn hàng đã được đặt" },
+        { status: "confirmed", note: "Đã xác nhận đơn" },
+      ],
+    },
+    {
+      status: "pending",
+      paymentStatus: "pending",
+      paymentMethod: "vnpay",
+      steps: [{ status: "pending", note: "Chờ thanh toán / xác nhận" }],
+    },
+  ];
+
+  const soldBump = new Map<string, number>();
+  let orderSeq = 2000;
+  const daysBack = 45;
+  const totalSyntheticOrders = 90;
+
+  async function createDemoOrder(opts: {
+    customerIndex: number | null;
+    basket: Line[];
+    daysAgo: number;
+    hour: number;
+    flowIndex: number;
+    voucherCode?: string;
+    walkIn?: boolean;
+    fulfillmentType?: string;
+    forceCode?: string;
+  }) {
+    const basket = opts.basket
+      .map((l) => ({ ...l, meta: productMeta[l.slug] }))
+      .filter((l) => l.meta);
+    if (basket.length < 2) return;
+
+    const subtotal = basket.reduce(
+      (s, l) => s + l.meta!.price * l.qty,
+      0
+    );
+    let discount = 0;
+    if (opts.voucherCode === "TAPHOA10" && subtotal >= 100000) {
+      discount = Math.round(subtotal * 0.1);
+    } else if (opts.voucherCode === "DEMO20" && subtotal >= 150000) {
+      discount = Math.round(subtotal * 0.2);
+    } else if (opts.voucherCode === "WELCOME" && subtotal >= 50000) {
+      discount = Math.round(subtotal * 0.05);
+    }
+
+    const flow = statusesFlow[opts.flowIndex % statusesFlow.length];
+    const isPickup = opts.fulfillmentType === "pickup" || opts.walkIn;
+    const shippingFee = isPickup ? 0 : subtotal >= 200000 ? 0 : 15000;
+    const total = subtotal - discount + shippingFee;
+
+    const createdAt = new Date();
+    createdAt.setDate(createdAt.getDate() - opts.daysAgo);
+    createdAt.setHours(opts.hour, (orderSeq * 7) % 60, 0, 0);
+
+    const customer =
+      opts.customerIndex === null ? null : customers[opts.customerIndex];
+    const orderCode =
+      opts.forceCode || `DH${String(orderSeq++).padStart(6, "0")}`;
+
+    await prisma.order.create({
+      data: {
+        orderCode,
+        userId: customer?.id,
+        customerName: customer?.name || "Khách tại quầy",
+        customerPhone: customer?.phone || "0388025515",
+        customerEmail: customer?.email,
+        subtotal,
+        shippingFee,
+        discount,
+        total,
+        status: opts.walkIn ? "delivered" : flow.status,
+        paymentMethod: opts.walkIn ? "cod" : flow.paymentMethod,
+        paymentStatus: opts.walkIn ? "paid" : flow.paymentStatus,
+        fulfillmentType: isPickup ? "pickup" : "delivery",
+        address: isPickup
+          ? "Nhận tại quầy — Tạp Hóa FPT"
+          : sampleAddresses[(opts.customerIndex ?? 0) % sampleAddresses.length],
+        voucherCode: opts.voucherCode,
+        note: opts.walkIn ? "Đơn POS / tại quầy (seed demo)" : undefined,
+        createdAt,
+        items: {
+          create: basket.map((l) => ({
+            productId: l.meta!.id,
+            quantity: l.qty,
+            price: l.meta!.price,
+            productName: l.meta!.name,
+            productImage: l.meta!.image,
+          })),
+        },
+        timeline: {
+          create: (opts.walkIn
+            ? [
+                { status: "pending", note: "Bán tại quầy" },
+                { status: "delivered", note: "Hoàn tất tại quầy" },
+              ]
+            : flow.steps
+          ).map((s, idx) => ({
+            status: s.status,
+            note: s.note,
+            createdAt: new Date(createdAt.getTime() + idx * 3600_000),
+          })),
+        },
+      },
+    });
+
+    if ((opts.walkIn ? "delivered" : flow.status) !== "cancelled") {
+      for (const l of basket) {
+        soldBump.set(l.slug, (soldBump.get(l.slug) || 0) + l.qty);
+      }
+    }
+  }
+
+  // 1) Đơn cố định — dễ nhắc khi bảo vệ
+  await createDemoOrder({
+    customerIndex: 0,
+    basket: baskets[0].lines,
+    daysAgo: 2,
+    hour: 9,
+    flowIndex: 0,
+    forceCode: "DHDEMO01",
+  });
+  await createDemoOrder({
+    customerIndex: 0,
+    basket: baskets[2].lines,
+    daysAgo: 5,
+    hour: 18,
+    flowIndex: 0,
+    forceCode: "DHDEMO02",
+  });
+  await createDemoOrder({
+    customerIndex: 0,
+    basket: baskets[4].lines,
+    daysAgo: 1,
+    hour: 10,
+    flowIndex: 2,
+    voucherCode: "TAPHOA10",
+    forceCode: "DHDEMO03",
+  });
+  await createDemoOrder({
+    customerIndex: 1,
+    basket: baskets[0].lines,
+    daysAgo: 0,
+    hour: 14,
+    flowIndex: 3,
+    forceCode: "DHDEMO04",
+  });
+  await createDemoOrder({
+    customerIndex: 2,
+    basket: [
+      { slug: "xoai-cat-hoa-loc", qty: 1 },
+      { slug: "dau-an-neptune-1l", qty: 1 },
+      { slug: "banh-oreo-133g", qty: 1 },
+    ],
+    daysAgo: 0,
+    hour: 11,
+    flowIndex: 4,
+    forceCode: "DHDEMO05",
   });
 
+  // 2) Nhiều đơn lặp basket → co-purchase / trending rõ
+  for (let i = 0; i < totalSyntheticOrders; i++) {
+    const basket = weightedBaskets[i % weightedBaskets.length].lines;
+    const daysAgo = 1 + (i % daysBack);
+    const hour = 7 + (i % 13); // 7h–19h peak
+    const customerIndex = i % 3 === 0 ? null : i % customers.length;
+    const walkIn = customerIndex === null;
+    const voucherCode =
+      i % 11 === 0 ? "TAPHOA10" : i % 17 === 0 ? "WELCOME" : undefined;
+
+    await createDemoOrder({
+      customerIndex: walkIn ? null : customerIndex,
+      basket,
+      daysAgo,
+      hour,
+      flowIndex: i % 7 === 0 ? 4 : i % 5 === 0 ? 2 : i % 4 === 0 ? 3 : i % 2,
+      voucherCode,
+      walkIn,
+      fulfillmentType: walkIn || i % 9 === 0 ? "pickup" : "delivery",
+    });
+  }
+
+  // 3) Một số đơn huỷ — demo báo cáo / lọc trạng thái
+  const cancelBasket = baskets[1].lines;
+  const cancelMeta = cancelBasket
+    .map((l) => ({ ...l, meta: productMeta[l.slug] }))
+    .filter((l) => l.meta);
+  const cancelSub = cancelMeta.reduce((s, l) => s + l.meta!.price * l.qty, 0);
   await prisma.order.create({
     data: {
-      orderCode: "DH001237",
-      userId: customers[4].id,
-      customerName: customers[4].name,
-      customerPhone: customers[4].phone!,
-      customerEmail: customers[4].email,
-      subtotal: 87000,
+      orderCode: "DHDEMO99",
+      userId: customers[3].id,
+      customerName: customers[3].name,
+      customerPhone: customers[3].phone!,
+      customerEmail: customers[3].email,
+      subtotal: cancelSub,
       shippingFee: 15000,
       discount: 0,
-      total: 102000,
-      status: "confirmed",
+      total: cancelSub + 15000,
+      status: "cancelled",
       paymentMethod: "cod",
       paymentStatus: "pending",
-      address: sampleAddresses[4],
+      address: sampleAddresses[3],
+      note: "Khách hủy — seed demo",
+      createdAt: new Date(Date.now() - 3 * 86400_000),
       items: {
-        create: [
-          { productId: productIds["xuc-xich-cp-500g"], quantity: 1, price: 55000, productName: "Xúc xích CP 500g", productImage: productImages.dongLanh },
-          { productId: productIds["sua-chua-vinamilk-loc-4"], quantity: 2, price: 16000, productName: "Sữa chua Vinamilk lốc 4", productImage: productImages.sua },
-        ],
+        create: cancelMeta.map((l) => ({
+          productId: l.meta!.id,
+          quantity: l.qty,
+          price: l.meta!.price,
+          productName: l.meta!.name,
+          productImage: l.meta!.image,
+        })),
       },
       timeline: {
         create: [
           { status: "pending", note: "Đơn hàng đã được đặt" },
-          { status: "confirmed", note: "Đã xác nhận đơn" },
+          { status: "cancelled", note: "Khách hủy đơn" },
         ],
       },
     },
   });
+
+  // Cập nhật soldCount từ đơn thật (không tính cancelled)
+  for (const [slug, qty] of soldBump) {
+    const id = productIds[slug];
+    if (!id) continue;
+    await prisma.product.update({
+      where: { id },
+      data: { soldCount: qty },
+    });
+  }
+
+  // Support chat — demo admin Tin nhắn
+  const thread = await prisma.supportThread.create({
+    data: {
+      userId: customers[0].id,
+      status: "open",
+      lastMessageAt: new Date(),
+      messages: {
+        create: [
+          {
+            senderRole: "customer",
+            senderId: customers[0].id,
+            senderName: customers[0].name,
+            content:
+              "Chào shop, mình muốn hỏi combo mì + nước ngọt có giảm không ạ?",
+            createdAt: new Date(Date.now() - 3600_000),
+          },
+          {
+            senderRole: "staff",
+            senderId: null,
+            senderName: "Nhân viên Minh",
+            content:
+              "Chào chị Lan! Đang có voucher TAPHOA10 (giảm 10% đơn từ 100K). Mì Hảo Hảo hay mua kèm Coca — vào giỏ sẽ thấy gợi ý thêm ạ.",
+            createdAt: new Date(Date.now() - 1800_000),
+            readAt: new Date(),
+          },
+          {
+            senderRole: "customer",
+            senderId: customers[0].id,
+            senderName: customers[0].name,
+            content: "Cảm ơn shop, mình xem gợi ý trên web nhé!",
+            createdAt: new Date(Date.now() - 600_000),
+          },
+        ],
+      },
+    },
+  });
+  void thread;
 
   const sample = await prisma.product.findFirst({
-    where: { slug: "rau-muong-sach-da-lat" },
+    where: { slug: "mi-hao-hao-tom-chua-cay" },
     include: { reviews: true },
   });
   const totalReviews = await prisma.review.count();
+  const totalOrders = await prisma.order.count();
+  const topSold = await prisma.product.findMany({
+    orderBy: { soldCount: "desc" },
+    take: 5,
+    select: { name: true, soldCount: true, slug: true },
+  });
 
-  console.log("Seed completed!");
-  console.log(`Customers: ${customers.length} | Products: ${productIdList.length} | Reviews: ${totalReviews}`);
+  console.log("\n========== SEED DEMO HOÀN TẤT ==========");
+  console.log(
+    `Khách: ${customers.length} | SP: ${productIdList.length} | Đánh giá: ${totalReviews} | Đơn: ${totalOrders}`
+  );
   if (sample) {
     console.log(
-      `Sample "${sample.name}": rating=${sample.rating} from ${sample.reviewCount} real reviews (DB has ${sample.reviews.length})`
+      `Gợi ý demo: mở "${sample.name}" → xem "Thường mua kèm" (Coca, Snack...)`
+    );
+    console.log(
+      `  soldCount=${sample.soldCount}, rating=${sample.rating} (${sample.reviewCount} reviews)`
     );
   }
-  console.log("Demo: khach@demo.com / chu@demo.com / nhanvien@demo.com");
-  console.log("Password: 123456");
+  console.log("Top bán chạy:");
+  for (const p of topSold) {
+    console.log(`  - ${p.name}: ${p.soldCount}`);
+  }
+  console.log("\n--- Tài khoản demo (mật khẩu: 123456) ---");
+  console.log("  Khách:      khach@demo.com     → đơn DHDEMO01–03, wishlist, chat");
+  console.log("  Chủ:        chu@demo.com       → admin / báo cáo");
+  console.log("  Nhân viên:  nhanvien@demo.com  → POS / xử lý đơn");
+  console.log("\n--- Script bảo vệ nhanh ---");
+  console.log("  1. Đăng nhập khach@demo.com → Trang chủ: Gợi ý dành cho bạn / Bán chạy");
+  console.log("  2. Mở SP Mì Hảo Hảo → Thường mua kèm: Coca, Snack (từ đơn thật)");
+  console.log("  3. Giỏ: thêm Mì + bỏ Coca → block 'Có thể bạn cần thêm'");
+  console.log("  4. Yêu thích / Đơn hàng: lịch sử + mua lại");
+  console.log("  5. Admin chu@demo.com: Tổng quan, Báo cáo, tồn thấp, tin nhắn");
+  console.log("  6. Voucher demo: TAPHOA10 | DEMO20 | WELCOME | FREESHIP");
+  console.log("  7. Đơn mẫu: DHDEMO01…05, DHDEMO99 (đã hủy)");
+  console.log("========================================\n");
 }
 
 main()
