@@ -642,7 +642,6 @@ async function main() {
   const soldBump = new Map<string, number>();
   let orderSeq = 2000;
   const daysBack = 45;
-  const totalSyntheticOrders = 90;
 
   async function createDemoOrder(opts: {
     customerIndex: number | null;
@@ -787,29 +786,70 @@ async function main() {
     forceCode: "DHDEMO05",
   });
 
-  // 2) Nhiều đơn lặp basket → co-purchase / trending rõ
-  for (let i = 0; i < totalSyntheticOrders; i++) {
-    const basket = weightedBaskets[i % weightedBaskets.length].lines;
-    const daysAgo = 1 + (i % daysBack);
-    const hour = 7 + (i % 13); // 7h–19h peak
-    const customerIndex = i % 3 === 0 ? null : i % customers.length;
-    const walkIn = customerIndex === null;
-    const voucherCode =
-      i % 11 === 0 ? "TAPHOA10" : i % 17 === 0 ? "WELCOME" : undefined;
-
-    await createDemoOrder({
-      customerIndex: walkIn ? null : customerIndex,
-      basket,
-      daysAgo,
-      hour,
-      flowIndex: i % 7 === 0 ? 4 : i % 5 === 0 ? 2 : i % 4 === 0 ? 3 : i % 2,
-      voucherCode,
-      walkIn,
-      fulfillmentType: walkIn || i % 9 === 0 ? "pickup" : "delivery",
-    });
+  // 2) Mỗi ngày ~2 đơn (cuối tuần 3) → biểu đồ cột đều hơn, vẫn giữ pattern mua kèm
+  let synth = 0;
+  for (let day = 0; day < daysBack; day++) {
+    const dow = new Date();
+    dow.setDate(dow.getDate() - day);
+    const isWeekend = dow.getDay() === 0 || dow.getDay() === 6;
+    const perDay = isWeekend ? 3 : 2;
+    for (let j = 0; j < perDay; j++) {
+      const basket = weightedBaskets[synth % weightedBaskets.length].lines;
+      const customerIndex = synth % 4 === 0 ? null : synth % customers.length;
+      const walkIn = customerIndex === null;
+      await createDemoOrder({
+        customerIndex: walkIn ? null : customerIndex,
+        basket,
+        daysAgo: day,
+        hour: 8 + j * 4 + (day % 2),
+        flowIndex:
+          day < 2 && j === 0
+            ? 4
+            : day < 5 && j === 0
+              ? 2
+              : synth % 5 === 0
+                ? 3
+                : 0,
+        voucherCode: synth % 14 === 0 ? "TAPHOA10" : undefined,
+        walkIn,
+        fulfillmentType: walkIn || synth % 8 === 0 ? "pickup" : "delivery",
+      });
+      synth += 1;
+    }
   }
 
-  // 3) Một số đơn huỷ — demo báo cáo / lọc trạng thái
+  // 3) Rải nhẹ các tháng đầu năm — biểu đồ "Năm nay" không trống dài
+  const nowSeed = new Date();
+  for (let month = 0; month < nowSeed.getMonth(); month++) {
+    for (let k = 0; k < 3; k++) {
+      const dayInMonth = 5 + k * 8;
+      const when = new Date(
+        nowSeed.getFullYear(),
+        month,
+        dayInMonth,
+        10 + (k % 6),
+        15,
+        0
+      );
+      if (when.getTime() > Date.now()) continue;
+      const daysAgo = Math.max(
+        1,
+        Math.floor((Date.now() - when.getTime()) / 86400000)
+      );
+      if (daysAgo < daysBack) continue;
+      await createDemoOrder({
+        customerIndex: (month + k) % customers.length,
+        basket: weightedBaskets[(month * 3 + k) % weightedBaskets.length].lines,
+        daysAgo,
+        hour: 9 + (k % 8),
+        flowIndex: 0,
+        walkIn: k % 3 === 0,
+        fulfillmentType: k % 3 === 0 ? "pickup" : "delivery",
+      });
+    }
+  }
+
+  // 4) Một số đơn huỷ — demo báo cáo / lọc trạng thái
   const cancelBasket = baskets[1].lines;
   const cancelMeta = cancelBasket
     .map((l) => ({ ...l, meta: productMeta[l.slug] }))

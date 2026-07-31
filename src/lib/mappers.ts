@@ -119,7 +119,7 @@ export function mapOrder(o: OrderWithRelations): Order {
     discount: o.discount,
     status: o.status as OrderStatus,
     paymentMethod: o.paymentMethod as "cod" | "transfer" | "vnpay",
-    paymentStatus: o.paymentStatus as "pending" | "paid" | "failed",
+    paymentStatus: o.paymentStatus as "pending" | "paid" | "failed" | "refunded",
     paymentTxnRef: o.paymentTxnRef || undefined,
     fulfillmentType:
       o.fulfillmentType === "pickup" ? "pickup" : "delivery",

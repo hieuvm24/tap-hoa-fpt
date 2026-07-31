@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Check, Truck, Package, X, Store, Wallet } from "lucide-react";
+import { Check, Truck, Package, X, Store, Wallet, Printer, RotateCcw } from "lucide-react";
 import { Order, OrderStatus } from "@/types";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { Modal, Button, Badge } from "@/components/ui";
+import { api } from "@/lib/api";
 
 interface OrderDetailModalProps {
   order: Order;
@@ -13,6 +14,7 @@ interface OrderDetailModalProps {
   onClose: () => void;
   onStatusUpdate: (id: string, status: OrderStatus) => void;
   onMarkPaid?: (id: string) => void;
+  onRefund?: (id: string) => void;
 }
 
 const statusLabels: Record<OrderStatus, string> = {
@@ -29,16 +31,16 @@ const paymentMethodLabels = {
   vnpay: "VNPay",
 };
 
-const paymentStatusLabels = {
+const paymentStatusLabels: Record<string, string> = {
   pending: "Chưa thanh toán",
   paid: "Đã thanh toán",
   failed: "Thất bại",
+  refunded: "Đã hoàn tiền",
 };
 
 function nextStatusFor(order: Order): OrderStatus | null {
   if (order.status === "pending") return "confirmed";
   if (order.status === "confirmed") {
-    // Đến lấy: bỏ bước "đang giao"
     return order.fulfillmentType === "pickup" ? "delivered" : "shipping";
   }
   if (order.status === "shipping") return "delivered";
@@ -72,69 +74,93 @@ export function OrderDetailModal({
   onClose,
   onStatusUpdate,
   onMarkPaid,
+  onRefund,
 }: OrderDetailModalProps) {
   const canAct = order.status !== "delivered" && order.status !== "cancelled";
   const next = nextStatusFor(order);
   const isPickup = order.fulfillmentType === "pickup";
   const canMarkPaid =
     order.paymentStatus !== "paid" &&
+    order.paymentStatus !== "refunded" &&
     order.status !== "cancelled" &&
     (order.paymentMethod === "cod" || order.paymentMethod === "transfer");
+  const canRefund =
+    order.paymentStatus === "paid" &&
+    (order.status === "cancelled" || canAct);
 
-  const footer =
-    canAct || canMarkPaid ? (
-      <div className="flex flex-wrap gap-2">
-        {canMarkPaid && onMarkPaid && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1"
-            onClick={() => onMarkPaid(order.id)}
-          >
-            <Wallet className="h-4 w-4" /> Đã thu tiền
-          </Button>
-        )}
-        {canAct && next && (
-          <Button
-            size="sm"
-            className="gap-1"
-            onClick={() => onStatusUpdate(order.id, next)}
-          >
-            {order.status === "pending" && (
-              <>
-                <Check className="h-4 w-4" /> Xác nhận
-              </>
-            )}
-            {order.status === "confirmed" && !isPickup && (
-              <>
-                <Truck className="h-4 w-4" /> Đang giao
-              </>
-            )}
-            {order.status === "confirmed" && isPickup && (
-              <>
-                <Store className="h-4 w-4" /> Đã lấy tại quầy
-              </>
-            )}
-            {order.status === "shipping" && (
-              <>
-                <Package className="h-4 w-4" /> Hoàn thành
-              </>
-            )}
-          </Button>
-        )}
-        {canAct && (
-          <Button
-            variant="danger"
-            size="sm"
-            className="gap-1"
-            onClick={() => onStatusUpdate(order.id, "cancelled")}
-          >
-            <X className="h-4 w-4" />
-            Hủy đơn
-          </Button>
-        )}
-      </div>
-    ) : undefined;
+  const footer = (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        className="gap-1"
+        onClick={() =>
+          window.open(api.orders.receiptUrl(order.id, { print: true }), "_blank")
+        }
+      >
+        <Printer className="h-4 w-4" /> In hóa đơn
+      </Button>
+      {canMarkPaid && onMarkPaid && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1"
+          onClick={() => onMarkPaid(order.id)}
+        >
+          <Wallet className="h-4 w-4" /> Đã thu tiền
+        </Button>
+      )}
+      {canRefund && onRefund && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1"
+          onClick={() => onRefund(order.id)}
+        >
+          <RotateCcw className="h-4 w-4" /> Hoàn tiền
+        </Button>
+      )}
+      {canAct && next && (
+        <Button
+          size="sm"
+          className="gap-1"
+          onClick={() => onStatusUpdate(order.id, next)}
+        >
+          {order.status === "pending" && (
+            <>
+              <Check className="h-4 w-4" /> Xác nhận
+            </>
+          )}
+          {order.status === "confirmed" && !isPickup && (
+            <>
+              <Truck className="h-4 w-4" /> Đang giao
+            </>
+          )}
+          {order.status === "confirmed" && isPickup && (
+            <>
+              <Store className="h-4 w-4" /> Đã lấy tại quầy
+            </>
+          )}
+          {order.status === "shipping" && (
+            <>
+              <Package className="h-4 w-4" /> Hoàn thành
+            </>
+          )}
+        </Button>
+      )}
+      {canAct && (
+        <Button
+          variant="danger"
+          size="sm"
+          className="gap-1"
+          onClick={() => onStatusUpdate(order.id, "cancelled")}
+        >
+          <X className="h-4 w-4" />
+          Hủy đơn
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <Modal
@@ -149,8 +175,16 @@ export function OrderDetailModal({
           <Badge variant={isPickup ? "info" : "default"}>
             {isPickup ? "Đến lấy tại quầy" : "Giao tận nơi"}
           </Badge>
-          <Badge variant={order.paymentStatus === "paid" ? "success" : "warning"}>
-            {paymentStatusLabels[order.paymentStatus]}
+          <Badge
+            variant={
+              order.paymentStatus === "paid"
+                ? "success"
+                : order.paymentStatus === "refunded"
+                  ? "info"
+                  : "warning"
+            }
+          >
+            {paymentStatusLabels[order.paymentStatus] || order.paymentStatus}
           </Badge>
           <Badge variant="default">
             {paymentMethodLabels[order.paymentMethod]}

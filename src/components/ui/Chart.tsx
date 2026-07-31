@@ -28,7 +28,7 @@ interface BarChartProps {
   hideValues?: boolean;
 }
 
-/** Cột đứng — tự cuộn ngang khi nhiều điểm, không đè nhãn */
+/** Cột đứng — mỗi cột có nhãn; cuộn ngang khi dày */
 export function BarChart({
   data,
   className,
@@ -38,12 +38,11 @@ export function BarChart({
 }: BarChartProps) {
   const maxValue = Math.max(0, ...data.map((d) => d.value));
   const n = data.length;
-  const dense = n > 16;
-  const veryDense = n > 40;
-  const showValues = hideValues === undefined ? !dense : !hideValues;
-  // Hiện nhãn trục X cách đều khi quá dày
-  const labelStep = veryDense ? Math.ceil(n / 10) : dense ? Math.ceil(n / 12) : 1;
-  const barMinWidth = veryDense ? 22 : dense ? 32 : 0;
+  const dense = n > 12;
+  const veryDense = n > 28;
+  const showValues = hideValues === undefined ? n <= 14 : !hideValues;
+  // Đủ rộng để luôn ghi được ngày dưới mỗi cột
+  const barMinWidth = veryDense ? 36 : dense ? 40 : 0;
   const scroll = dense && barMinWidth > 0;
 
   if (n === 0) {
@@ -54,11 +53,17 @@ export function BarChart({
 
   return (
     <div className={cn("w-full", className)}>
-      <div className={cn("h-56 w-full", scroll && "overflow-x-auto pb-1")}>
+      {/* Thang tham chiếu max */}
+      {maxValue > 0 && (
+        <div className="mb-1 flex justify-end text-[10px] text-gray-400">
+          Max {formatChartValue(maxValue, valueFormat)}
+        </div>
+      )}
+      <div className={cn("h-60 w-full", scroll && "overflow-x-auto pb-1")}>
         <div
           className={cn(
             "flex h-full items-stretch",
-            dense ? "gap-0.5 sm:gap-1" : "gap-2 sm:gap-3"
+            dense ? "gap-1" : "gap-2 sm:gap-3"
           )}
           style={
             scroll
@@ -68,28 +73,37 @@ export function BarChart({
         >
           {data.map((item, i) => {
             const ratio = maxValue > 0 ? item.value / maxValue : 0;
-            const heightPct = item.value > 0 ? Math.max(ratio * 100, 6) : 0;
-            const showLabel =
-              i === 0 || i === n - 1 || i % labelStep === 0;
+            // Cột 0 vẫn hiện nền; cột có data tối thiểu ~8% để nhìn được
+            const heightPct =
+              item.value > 0 ? Math.max(ratio * 100, 8) : 0;
+            const shortLabel =
+              item.label.length > 6 && item.label.includes("-")
+                ? item.label.split("-").pop() || item.label
+                : item.label;
+
             return (
               <div
                 key={`${item.label}-${i}`}
                 className="flex min-w-0 flex-1 flex-col"
-                style={scroll ? { minWidth: barMinWidth, flex: "0 0 auto" } : undefined}
+                style={
+                  scroll
+                    ? { minWidth: barMinWidth, flex: "0 0 auto" }
+                    : undefined
+                }
               >
                 <div
                   className={cn(
-                    "mb-1 h-5 text-center font-medium text-gray-600",
+                    "mb-1 h-5 text-center font-medium tabular-nums text-gray-600",
                     dense ? "text-[9px]" : "text-[11px] sm:text-xs"
                   )}
                 >
-                  {showValues && item.value > 0
-                    ? formatChartValue(item.value, valueFormat)
-                    : showValues
-                      ? "—"
-                      : ""}
+                  {showValues
+                    ? item.value > 0
+                      ? formatChartValue(item.value, valueFormat)
+                      : "—"
+                    : ""}
                 </div>
-                <div className="relative min-h-0 flex-1 rounded-md bg-gray-50">
+                <div className="relative min-h-0 flex-1 rounded-md bg-gray-100/80">
                   <div
                     className={cn(
                       "absolute bottom-0 top-1 flex items-end",
@@ -100,21 +114,25 @@ export function BarChart({
                       className={cn(
                         "w-full rounded-t-md transition-all duration-500 hover:opacity-90",
                         color,
-                        item.value === 0 && "opacity-0"
+                        item.value === 0 && "bg-gray-200 opacity-40"
                       )}
-                      style={{ height: `${heightPct}%` }}
+                      style={{
+                        height: item.value === 0 ? "4%" : `${heightPct}%`,
+                      }}
                       title={`${item.label}: ${formatChartValue(item.value, valueFormat)}`}
                     />
                   </div>
                 </div>
                 <div
                   className={cn(
-                    "mt-1.5 text-center font-medium text-gray-600",
-                    dense ? "text-[9px] leading-tight" : "truncate text-[11px] sm:text-xs"
+                    "mt-1.5 text-center font-semibold tabular-nums text-gray-700",
+                    dense
+                      ? "text-[10px] leading-tight"
+                      : "truncate text-[11px] sm:text-xs"
                   )}
                   title={item.label}
                 >
-                  {showLabel ? item.label : ""}
+                  {dense ? shortLabel : item.label}
                 </div>
               </div>
             );
@@ -123,7 +141,7 @@ export function BarChart({
       </div>
       {scroll && (
         <p className="mt-1 text-center text-[10px] text-gray-400">
-          Vuốt ngang để xem thêm · di chuột vào cột để xem chi tiết
+          Vuốt ngang để xem đủ ngày · di chuột vào cột để xem số liệu
         </p>
       )}
     </div>

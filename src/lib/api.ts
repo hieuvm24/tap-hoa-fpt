@@ -94,6 +94,19 @@ export const api = {
           body: JSON.stringify({ currentPassword, newPassword }),
         }
       ),
+    getNotifyPrefs: () =>
+      request<{ prefs: { order: boolean; promo: boolean; news: boolean } }>(
+        "/auth/preferences"
+      ),
+    updateNotifyPrefs: (prefs: {
+      order?: boolean;
+      promo?: boolean;
+      news?: boolean;
+    }) =>
+      request<{ prefs: { order: boolean; promo: boolean; news: boolean } }>(
+        "/auth/preferences",
+        { method: "PATCH", body: JSON.stringify(prefs) }
+      ),
   },
 
   products: {
@@ -195,9 +208,14 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ paymentStatus: "paid", note }),
       }),
+    refund: (id: string, note?: string) =>
+      request<import("@/types").Order>(`/orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ paymentStatus: "refunded", note }),
+      }),
     updatePayment: (
       id: string,
-      paymentStatus: "pending" | "paid" | "failed",
+      paymentStatus: "pending" | "paid" | "failed" | "refunded",
       note?: string
     ) =>
       request<import("@/types").Order>(`/orders/${id}`, {
@@ -218,10 +236,20 @@ export const api = {
       const qs = params ? "?" + new URLSearchParams(params).toString() : "";
       return `${BASE}/orders/export${qs}`;
     },
-    cancel: (id: string, note?: string) =>
+    cancel: (
+      id: string,
+      note?: string,
+      guest?: { phone: string; orderCode?: string }
+    ) =>
       request<import("@/types").Order>(`/orders/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ action: "cancel", note }),
+        body: JSON.stringify({
+          action: "cancel",
+          note,
+          ...(guest
+            ? { phone: guest.phone, orderCode: guest.orderCode }
+            : {}),
+        }),
       }),
     reorder: (id: string) =>
       request<{
@@ -237,6 +265,17 @@ export const api = {
         }[];
         unavailable: { productId: string; name: string; reason: string }[];
       }>(`/orders/${id}/reorder`, { method: "POST" }),
+    receiptUrl: (
+      id: string,
+      opts?: { print?: boolean; phone?: string; code?: string }
+    ) => {
+      const q = new URLSearchParams();
+      if (opts?.print) q.set("print", "1");
+      if (opts?.phone) q.set("phone", opts.phone);
+      if (opts?.code) q.set("code", opts.code);
+      const qs = q.toString();
+      return `/api/orders/${id}/receipt${qs ? `?${qs}` : ""}`;
+    },
   },
 
   promotions: {

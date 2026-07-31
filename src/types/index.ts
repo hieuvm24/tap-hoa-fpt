@@ -68,7 +68,7 @@ export interface Order {
   discount: number;
   status: OrderStatus;
   paymentMethod: "cod" | "transfer" | "vnpay";
-  paymentStatus: "pending" | "paid" | "failed";
+  paymentStatus: "pending" | "paid" | "failed" | "refunded";
   paymentTxnRef?: string;
   /** delivery = giao tận nơi | pickup = đến lấy tại quầy */
   fulfillmentType: "delivery" | "pickup";

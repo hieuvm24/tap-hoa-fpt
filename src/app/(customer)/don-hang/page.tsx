@@ -39,6 +39,7 @@ const paymentStatusLabels: Record<string, string> = {
   pending: "Chưa thanh toán",
   paid: "Đã thanh toán",
   failed: "Thanh toán thất bại",
+  refunded: "Đã hoàn tiền",
 };
 
 function deliverySteps(order: Order): OrderStatus[] {
@@ -296,6 +297,24 @@ function OrdersContent() {
                     selectedOrder.paymentStatus}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      window.open(
+                        api.orders.receiptUrl(selectedOrder.id, {
+                          print: true,
+                          phone: guestMode
+                            ? lookupPhone || selectedOrder.customerPhone
+                            : undefined,
+                          code: guestMode ? selectedOrder.orderCode : undefined,
+                        }),
+                        "_blank"
+                      )
+                    }
+                  >
+                    In hóa đơn
+                  </Button>
                   {isAuthenticated &&
                     selectedOrder.paymentMethod === "vnpay" &&
                     selectedOrder.paymentStatus !== "paid" &&
@@ -352,7 +371,17 @@ function OrdersContent() {
                       Mua lại
                     </Button>
                   )}
-                  {isAuthenticated &&
+                  {selectedOrder.status === "delivered" &&
+                    selectedOrder.items[0]?.product?.slug && (
+                      <Link
+                        href={`/san-pham/${selectedOrder.items[0].product.slug}#reviews`}
+                      >
+                        <Button size="sm" variant="outline">
+                          Đánh giá sản phẩm
+                        </Button>
+                      </Link>
+                    )}
+                  {(isAuthenticated || guestMode) &&
                     (selectedOrder.status === "pending" ||
                       selectedOrder.status === "confirmed") &&
                     selectedOrder.paymentStatus !== "paid" && (
@@ -362,7 +391,17 @@ function OrdersContent() {
                         className="text-red-600 border-red-200 hover:bg-red-50"
                         onClick={async () => {
                           if (!confirm("Bạn chắc chắn muốn hủy đơn này?")) return;
-                          const res = await api.orders.cancel(selectedOrder.id);
+                          const res = await api.orders.cancel(
+                            selectedOrder.id,
+                            undefined,
+                            !isAuthenticated
+                              ? {
+                                  phone:
+                                    lookupPhone || selectedOrder.customerPhone,
+                                  orderCode: selectedOrder.orderCode,
+                                }
+                              : undefined
+                          );
                           if (res.success && res.data) {
                             setOrders((prev) =>
                               prev.map((o) =>
@@ -379,13 +418,33 @@ function OrdersContent() {
                       </Button>
                     )}
                 </div>
-                {isAuthenticated &&
-                  selectedOrder.paymentStatus === "paid" &&
+                {selectedOrder.paymentStatus === "paid" &&
                   selectedOrder.status !== "cancelled" &&
                   selectedOrder.status !== "delivered" && (
                     <p className="mt-3 text-xs text-amber-700">
                       Đơn đã thanh toán — liên hệ cửa hàng nếu cần hủy / hoàn tiền.
                     </p>
+                  )}
+                {selectedOrder.status === "delivered" &&
+                  selectedOrder.items.length > 1 && (
+                    <div className="mt-3 space-y-1">
+                      <p className="text-xs font-medium text-gray-600">
+                        Đánh giá từng sản phẩm:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedOrder.items.map((it, idx) =>
+                          it.product?.slug ? (
+                            <Link
+                              key={`${it.product.id}-${idx}`}
+                              href={`/san-pham/${it.product.slug}#reviews`}
+                              className="text-xs text-primary-600 hover:underline"
+                            >
+                              {it.product.name}
+                            </Link>
+                          ) : null
+                        )}
+                      </div>
+                    </div>
                   )}
               </div>
             </Card>

@@ -62,7 +62,7 @@ const PRESETS = [
   { id: "year", label: "Năm nay" },
 ] as const;
 
-/** Gộp doanh thu theo tuần — dùng khi kỳ dài (năm / > 45 ngày) */
+/** Gộp doanh thu theo tuần — bỏ tuần trống đầu kỳ (năm) */
 function aggregateByWeek(daily: ChartData[]): ChartData[] {
   const weeks: ChartData[] = [];
   for (let i = 0; i < daily.length; i += 7) {
@@ -71,7 +71,13 @@ function aggregateByWeek(daily: ChartData[]): ChartData[] {
     const start = chunk[0]?.label || `T${weeks.length + 1}`;
     weeks.push({ label: start, value });
   }
-  return weeks;
+  const first = weeks.findIndex((w) => w.value > 0);
+  return first > 0 ? weeks.slice(first) : weeks;
+}
+
+function shortDayLabel(label: string): string {
+  if (label.includes("-")) return label.split("-").pop() || label;
+  return label;
 }
 
 function prepareTrendChart(
@@ -86,7 +92,7 @@ function prepareTrendChart(
   if (preset === "year") {
     return {
       title: "Doanh thu theo tuần",
-      note: "Kỳ năm — gộp theo tuần để dễ đọc. Chi tiết tháng ở biểu đồ bên dưới.",
+      note: "Kỳ năm — gộp theo tuần (bỏ tuần trống đầu năm). Chi tiết tháng bên dưới.",
       data: aggregateByWeek(daily),
       showMonthly: true,
     };
@@ -99,25 +105,15 @@ function prepareTrendChart(
       showMonthly: true,
     };
   }
-  if (daily.length > 31) {
-    return {
-      title: "Doanh thu theo ngày",
-      note: "Vuốt ngang biểu đồ nếu không thấy hết ngày.",
-      data: daily.map((d) => ({
-        ...d,
-        label: d.label.includes("-") ? d.label.split("-")[1] : d.label,
-      })),
-      showMonthly: true,
-    };
-  }
   return {
     title: "Doanh thu theo ngày",
+    note:
+      daily.length > 14
+        ? "Mỗi cột một ngày — vuốt ngang nếu cần."
+        : undefined,
     data: daily.map((d) => ({
       ...d,
-      label:
-        daily.length > 14 && d.label.includes("-")
-          ? d.label.split("-")[1]
-          : d.label,
+      label: shortDayLabel(d.label),
     })),
     showMonthly: preset !== "7d",
   };

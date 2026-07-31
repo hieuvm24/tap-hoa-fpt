@@ -46,11 +46,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session) return apiError("Unauthorized", 401);
-
   const { id } = await params;
   const body = await req.json();
   const { status, note, paymentStatus, action } = body;
+  const guestPhone = String(body.phone || "").replace(/\D/g, "");
+  const guestCode = String(body.orderCode || "")
+    .trim()
+    .toUpperCase();
 
   const existing = await prisma.order.findUnique({
     where: { id },
@@ -58,23 +60,35 @@ export async function PATCH(
   });
   if (!existing) return apiError("Không tìm thấy đơn hàng", 404);
 
-  const isAdmin = isAdminRole(session.role);
-  const isOwner = existing.userId === session.userId;
+  const isAdmin = !!(session && isAdminRole(session.role));
+  const isOwner = !!(session && existing.userId === session.userId);
+  const guestMatch =
+    guestPhone.length >= 9 &&
+    existing.customerPhone.replace(/\D/g, "") === guestPhone &&
+    (!guestCode || guestCode === existing.orderCode.toUpperCase());
 
   const wantsCancel = action === "cancel" || status === "cancelled";
 
   if (wantsCancel) {
-    if (!isOwner && !isAdmin) return apiError("Forbidden", 403);
+    if (!isOwner && !isAdmin && !guestMatch) {
+      return apiError(
+        session
+          ? "Forbidden"
+          : "Cần mã đơn và SĐT khớp để hủy (khách vãng lai)",
+        403
+      );
+    }
     if (!CANCELLABLE.has(existing.status)) {
       return apiError("Đơn hàng không thể hủy ở trạng thái hiện tại");
     }
-    // Don da thanh toan online: chi admin xu ly (hoan tien thu cong)
+    // Don da thanh toan online: chi admin xu ly (hoan tien)
     if (existing.paymentStatus === "paid" && !isAdmin) {
       return apiError(
         "Đơn đã thanh toán — liên hệ cửa hàng để hủy / hoàn tiền"
       );
     }
 
+    const wasPaid = existing.paymentStatus === "paid";
     try {
       const order = await prisma.$transaction(async (tx) => {
         // Atomic: chi 1 request duoc huy
@@ -83,7 +97,10 @@ export async function PATCH(
             id,
             status: { in: ["pending", "confirmed"] },
           },
-          data: { status: "cancelled" },
+          data: {
+            status: "cancelled",
+            ...(wasPaid && isAdmin ? { paymentStatus: "refunded" } : {}),
+          },
         });
         if (locked.count === 0) {
           throw new Error("CANCEL_RACE");
@@ -111,7 +128,13 @@ export async function PATCH(
                 status: "cancelled",
                 note:
                   note ||
-                  (isAdmin ? "Cửa hàng hủy đơn" : "Khách hủy đơn"),
+                  (isAdmin
+                    ? wasPaid
+                      ? "Cửa hàng hủy đơn — đã hoàn tiền (ghi nhận)"
+                      : "Cửa hàng hủy đơn"
+                    : guestMatch && !isOwner
+                      ? "Khách hủy đơn (tra cứu mã + SĐT)"
+                      : "Khách hủy đơn"),
               },
             },
           },
@@ -127,6 +150,7 @@ export async function PATCH(
     }
   }
 
+  if (!session) return apiError("Unauthorized", 401);
   if (!isAdmin) return apiError("Forbidden", 403);
 
   if (status) {
@@ -173,11 +197,8 @@ export async function PATCH(
     return apiError("Cần truyền status hoặc paymentStatus");
   }
 
-  // Chỉ xác nhận thu tiền (COD / CK) — không đổi trạng thái đơn
+  // Chỉ xác nhận thu tiền / hoàn tiền — không đổi trạng thái đơn
   if (!status && nextPayment) {
-    if (nextPayment !== "paid" && nextPayment !== "pending" && nextPayment !== "failed") {
-      return apiError("Trạng thái thanh toán không hợp lệ");
-    }
     const order = await prisma.order.update({
       where: { id },
       data: {
@@ -191,7 +212,9 @@ export async function PATCH(
                 ? existing.paymentMethod === "transfer"
                   ? "Đã xác nhận chuyển khoản"
                   : "Đã thu tiền COD"
-                : `Cập nhật thanh toán: ${nextPayment}`),
+                : nextPayment === "refunded"
+                  ? "Đã hoàn tiền cho khách"
+                  : `Cập nhật thanh toán: ${nextPayment}`),
           },
         },
       },

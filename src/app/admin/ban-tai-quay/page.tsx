@@ -23,7 +23,10 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "transfer">("cod");
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [lastOrder, setLastOrder] = useState<string | null>(null);
+  const [lastOrder, setLastOrder] = useState<{
+    id: string;
+    orderCode: string;
+  } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -128,7 +131,7 @@ export default function PosPage() {
       alert(res.error || "Không tạo được hóa đơn");
       return;
     }
-    setLastOrder(res.data.orderCode);
+    setLastOrder({ id: res.data.id, orderCode: res.data.orderCode });
     setLines([]);
     setCustomerName("Khách lẻ");
     setCustomerPhone("");
@@ -145,9 +148,23 @@ export default function PosPage() {
           </p>
         </div>
         {lastOrder && (
-          <p className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
-            Đã bán: <strong>{lastOrder}</strong>
-          </p>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
+            <span>
+              Đã bán: <strong>{lastOrder.orderCode}</strong>
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                window.open(
+                  api.orders.receiptUrl(lastOrder.id, { print: true }),
+                  "_blank"
+                )
+              }
+            >
+              In hóa đơn
+            </Button>
+          </div>
         )}
       </div>
 

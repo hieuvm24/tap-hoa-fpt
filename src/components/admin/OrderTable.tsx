@@ -128,6 +128,17 @@ export function OrderTable() {
     }
   };
 
+  const handleRefund = async (id: string) => {
+    if (!confirm("Ghi nhận đã hoàn tiền cho khách?")) return;
+    const res = await api.orders.refund(id, "Đã hoàn tiền cho khách");
+    if (res.success && res.data) {
+      setSelectedOrder(res.data);
+      loadOrders();
+    } else {
+      alert(res.error || "Hoàn tiền thất bại");
+    }
+  };
+
   const handleExport = () => {
     const params: Record<string, string> = {};
     if (status) params.status = status;
@@ -356,6 +367,7 @@ export function OrderTable() {
           onClose={() => setSelectedOrder(null)}
           onStatusUpdate={handleStatusUpdate}
           onMarkPaid={handleMarkPaid}
+          onRefund={handleRefund}
         />
       )}
     </>

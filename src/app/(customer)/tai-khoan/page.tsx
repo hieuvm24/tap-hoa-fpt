@@ -56,6 +56,13 @@ function AccountContent() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMsg, setPasswordMsg] = useState("");
+  const [notifyPrefs, setNotifyPrefs] = useState({
+    order: true,
+    promo: true,
+    news: true,
+  });
+  const [notifySaved, setNotifySaved] = useState(false);
+  const [notifySaving, setNotifySaving] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -76,6 +83,9 @@ function AccountContent() {
     });
     api.addresses.list().then((res) => {
       if (res.success && res.data) setAddresses(res.data);
+    });
+    api.auth.getNotifyPrefs().then((res) => {
+      if (res.success && res.data?.prefs) setNotifyPrefs(res.data.prefs);
     });
   }, []);
 
@@ -395,13 +405,27 @@ function AccountContent() {
             <Card>
               <h2 className="text-lg font-semibold mb-4">Cài đặt thông báo</h2>
               <div className="space-y-4">
-                {[
-                  { label: "Thông báo đơn hàng", desc: "Cập nhật trạng thái giao hàng" },
-                  { label: "Khuyến mãi & ưu đãi", desc: "Nhận thông tin giảm giá mới" },
-                  { label: "Tin tức cửa hàng", desc: "Sản phẩm mới, thông báo từ shop" },
-                ].map((item) => (
+                {(
+                  [
+                    {
+                      key: "order" as const,
+                      label: "Thông báo đơn hàng",
+                      desc: "Cập nhật trạng thái giao hàng",
+                    },
+                    {
+                      key: "promo" as const,
+                      label: "Khuyến mãi & ưu đãi",
+                      desc: "Nhận thông tin giảm giá mới",
+                    },
+                    {
+                      key: "news" as const,
+                      label: "Tin tức cửa hàng",
+                      desc: "Sản phẩm mới, thông báo từ shop",
+                    },
+                  ] as const
+                ).map((item) => (
                   <label
-                    key={item.label}
+                    key={item.key}
                     className="flex items-center justify-between py-2 cursor-pointer"
                   >
                     <div>
@@ -410,11 +434,39 @@ function AccountContent() {
                     </div>
                     <input
                       type="checkbox"
-                      defaultChecked
+                      checked={notifyPrefs[item.key]}
+                      onChange={(e) =>
+                        setNotifyPrefs((p) => ({
+                          ...p,
+                          [item.key]: e.target.checked,
+                        }))
+                      }
                       className="h-5 w-5 rounded text-primary-500 focus:ring-primary-500"
                     />
                   </label>
                 ))}
+                {notifySaved && (
+                  <p className="text-sm text-primary-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4" /> Đã lưu tùy chọn
+                  </p>
+                )}
+                <Button
+                  isLoading={notifySaving}
+                  onClick={async () => {
+                    setNotifySaving(true);
+                    setNotifySaved(false);
+                    const res = await api.auth.updateNotifyPrefs(notifyPrefs);
+                    setNotifySaving(false);
+                    if (res.success && res.data?.prefs) {
+                      setNotifyPrefs(res.data.prefs);
+                      setNotifySaved(true);
+                    } else {
+                      alert(res.error || "Không lưu được");
+                    }
+                  }}
+                >
+                  <Save className="h-4 w-4 mr-1" /> Lưu cài đặt
+                </Button>
               </div>
             </Card>
           )}

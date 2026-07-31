@@ -15,6 +15,14 @@ function endOfDay(d: Date) {
   return x;
 }
 
+/** YYYY-MM-DD theo giờ máy (tránh lệch UTC làm lệch cột ngày) */
+function localDateKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function pctChange(current: number, previous: number) {
   if (previous > 0) {
     return Math.round(((current - previous) / previous) * 1000) / 10;
@@ -148,19 +156,20 @@ export async function GET(req: NextRequest) {
   const shippingTotal = rangeOrders.reduce((s, o) => s + o.shippingFee, 0);
   const subtotalTotal = rangeOrders.reduce((s, o) => s + o.subtotal, 0);
 
-  // Doanh thu theo ngày
+  // Doanh thu theo ngày (mốc giờ local)
   const dayMap = new Map<string, number>();
   for (
     let t = startOfDay(from).getTime();
     t <= startOfDay(to).getTime();
     t += 86400000
   ) {
-    const key = new Date(t).toISOString().slice(0, 10);
-    dayMap.set(key, 0);
+    dayMap.set(localDateKey(new Date(t)), 0);
   }
   for (const o of rangeOrders) {
-    const key = o.createdAt.toISOString().slice(0, 10);
-    dayMap.set(key, (dayMap.get(key) || 0) + o.total);
+    const key = localDateKey(o.createdAt);
+    if (dayMap.has(key)) {
+      dayMap.set(key, (dayMap.get(key) || 0) + o.total);
+    }
   }
   const dailyRevenue = [...dayMap.entries()].map(([label, value]) => ({
     label: label.slice(5),
