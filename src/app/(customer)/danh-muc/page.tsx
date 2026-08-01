@@ -574,8 +574,8 @@ function CategoryPageContent() {
           )}
 
           <div className="mt-10 border-t border-gray-100 pt-2">
-            <ProductRecommendations variant="bestsellers" limit={4} />
-            <ProductRecommendations variant="personalized" limit={4} />
+            <ProductRecommendations variant="bestsellers" limit={32} />
+            <ProductRecommendations variant="personalized" limit={32} />
           </div>
         </div>
       </div>

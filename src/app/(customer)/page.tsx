@@ -15,8 +15,8 @@ export default function HomePage() {
       <CategoryGrid />
       <FeaturedProducts />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-2">
-        <ProductRecommendations variant="bestsellers" limit={4} />
-        <ProductRecommendations variant="personalized" limit={4} />
+        <ProductRecommendations variant="bestsellers" limit={32} />
+        <ProductRecommendations variant="personalized" limit={32} />
         <ProductRecommendations variant="recent" limit={4} />
       </div>
       <PromotionCarousel />

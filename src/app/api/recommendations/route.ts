@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
   const type = searchParams.get("type") || "personalized";
   const productId = searchParams.get("productId");
   const limit = Math.min(
-    Math.max(parseInt(searchParams.get("limit") || "4", 10) || 4, 1),
-    12
+    Math.max(parseInt(searchParams.get("limit") || "8", 10) || 8, 1),
+    32
   );
   const recentIds = (searchParams.get("recentIds") || "")
     .split(",")

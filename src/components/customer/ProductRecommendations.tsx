@@ -19,7 +19,7 @@ import {
   getRecentlyViewed,
   getRecentIds,
 } from "@/lib/recommendations";
-import { ProductCard } from "./ProductCard";
+import { ProductPagedGrid } from "./ProductPagedGrid";
 import { api } from "@/lib/api";
 
 export type RecVariant =
@@ -62,7 +62,7 @@ export function ProductRecommendations({
   );
 
   useEffect(() => {
-    api.products.list({ limit: "80", sort: "sold" }).then((res) => {
+    api.products.list({ limit: "120", sort: "sold" }).then((res) => {
       if (res.success && res.data) {
         const list = Array.isArray(res.data) ? res.data : res.data.products;
         setAllProducts(list);
@@ -228,18 +228,11 @@ export function ProductRecommendations({
         </div>
         <p className="text-sm text-gray-500">{config.subtitle}</p>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-        {items.map((p) => (
-          <div key={p.id} className="min-w-0">
-            <ProductCard product={p} />
-            {!hideReasons && reasons[p.id] && (
-              <p className="mt-1.5 line-clamp-1 px-0.5 text-[11px] text-gray-400">
-                {reasons[p.id]}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
+      <ProductPagedGrid
+        products={items}
+        reasons={reasons}
+        hideReasons={hideReasons}
+      />
     </section>
   );
 }

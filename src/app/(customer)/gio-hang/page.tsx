@@ -79,8 +79,8 @@ function CartPageContent() {
               <Button>Tiếp tục mua sắm</Button>
             </Link>
           </div>
-          <ProductRecommendations variant="bestsellers" limit={4} />
-          <ProductRecommendations variant="personalized" limit={4} />
+          <ProductRecommendations variant="bestsellers" limit={32} />
+          <ProductRecommendations variant="personalized" limit={32} />
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
