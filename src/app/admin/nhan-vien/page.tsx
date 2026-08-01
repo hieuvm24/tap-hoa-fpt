@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, Button, Input, Modal, Badge } from "@/components/ui";
 import { api } from "@/lib/api";
 import { Plus, Trash2, KeyRound } from "lucide-react";
+import { confirmDialog, promptDialog, toast } from "@/lib/feedback";
 
 type Staff = {
   id: string;
@@ -43,29 +44,42 @@ export default function AdminStaffPage() {
     if (res.success) {
       setOpen(false);
       setForm({ name: "", email: "", phone: "", password: "", role: "STAFF" });
+      toast.success("Đã tạo tài khoản nhân viên");
       load();
     } else {
-      alert(res.error || "Không tạo được nhân viên");
+      toast.error(res.error || "Không tạo được nhân viên");
     }
   };
 
   const handleResetPassword = async (s: Staff) => {
-    const password = prompt(`Mật khẩu mới cho ${s.name} (tối thiểu 6 ký tự):`);
+    const password = await promptDialog({
+      title: "Đổi mật khẩu",
+      message: `Nhập mật khẩu mới cho ${s.name} (tối thiểu 6 ký tự).`,
+      inputType: "password",
+      placeholder: "Mật khẩu mới",
+      confirmText: "Đổi mật khẩu",
+      validate: (v) =>
+        v.length < 6 ? "Mật khẩu phải có ít nhất 6 ký tự" : null,
+    });
     if (!password) return;
-    if (password.length < 6) {
-      alert("Mật khẩu quá ngắn");
-      return;
-    }
     const res = await api.staff.update(s.id, { password });
-    if (res.success) alert("Đã đổi mật khẩu");
-    else alert(res.error || "Lỗi đổi mật khẩu");
+    if (res.success) toast.success("Đã đổi mật khẩu");
+    else toast.error(res.error || "Lỗi đổi mật khẩu");
   };
 
   const handleDelete = async (s: Staff) => {
-    if (!confirm(`Xóa tài khoản ${s.name}?`)) return;
+    const ok = await confirmDialog({
+      title: "Xóa tài khoản",
+      message: `Xóa tài khoản ${s.name}? Nhân viên sẽ không đăng nhập được nữa.`,
+      variant: "danger",
+      confirmText: "Xóa tài khoản",
+    });
+    if (!ok) return;
     const res = await api.staff.delete(s.id);
-    if (res.success) load();
-    else alert(res.error || "Không xóa được");
+    if (res.success) {
+      toast.success("Đã xóa tài khoản");
+      load();
+    } else toast.error(res.error || "Không xóa được");
   };
 
   return (

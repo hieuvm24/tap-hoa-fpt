@@ -8,6 +8,7 @@ import { Badge, Button, Input } from "@/components/ui";
 import { Order, OrderStatus } from "@/types";
 import { OrderDetailModal } from "./OrderDetailModal";
 import { api } from "@/lib/api";
+import { confirmDialog, toast } from "@/lib/feedback";
 
 const statusConfig: Record<
   OrderStatus,
@@ -112,9 +113,10 @@ export function OrderTable() {
         : await api.orders.updateStatus(id, next);
     if (res.success && res.data) {
       setSelectedOrder(res.data);
+      toast.success("Đã cập nhật trạng thái đơn");
       loadOrders();
     } else if (!res.success) {
-      alert(res.error || "Cập nhật thất bại");
+      toast.error(res.error || "Cập nhật thất bại");
     }
   };
 
@@ -122,20 +124,28 @@ export function OrderTable() {
     const res = await api.orders.markPaid(id);
     if (res.success && res.data) {
       setSelectedOrder(res.data);
+      toast.success("Đã xác nhận thanh toán");
       loadOrders();
     } else {
-      alert(res.error || "Xác nhận thanh toán thất bại");
+      toast.error(res.error || "Xác nhận thanh toán thất bại");
     }
   };
 
   const handleRefund = async (id: string) => {
-    if (!confirm("Ghi nhận đã hoàn tiền cho khách?")) return;
+    const ok = await confirmDialog({
+      title: "Hoàn tiền",
+      message: "Ghi nhận đã hoàn tiền cho khách?",
+      confirmText: "Xác nhận hoàn tiền",
+      variant: "danger",
+    });
+    if (!ok) return;
     const res = await api.orders.refund(id, "Đã hoàn tiền cho khách");
     if (res.success && res.data) {
       setSelectedOrder(res.data);
+      toast.success("Đã ghi nhận hoàn tiền");
       loadOrders();
     } else {
-      alert(res.error || "Hoàn tiền thất bại");
+      toast.error(res.error || "Hoàn tiền thất bại");
     }
   };
 
@@ -154,19 +164,24 @@ export function OrderTable() {
       .map((o) => o.id)
       .slice(0, 50);
     if (pendingIds.length === 0) {
-      alert("Không có đơn chờ xác nhận trong danh sách hiện tại");
+      toast.info("Không có đơn chờ xác nhận trong danh sách hiện tại");
       return;
     }
-    if (!confirm(`Xác nhận ${pendingIds.length} đơn đang chờ?`)) return;
+    const ok = await confirmDialog({
+      title: "Xác nhận hàng loạt",
+      message: `Xác nhận ${pendingIds.length} đơn đang chờ?`,
+      confirmText: "Xác nhận tất cả",
+    });
+    if (!ok) return;
     const res = await api.orders.bulkStatus(pendingIds, "confirmed");
     if (res.success && res.data) {
-      alert(
+      toast.success(
         `Đã cập nhật ${res.data.updated} đơn` +
           (res.data.skipped ? `, bỏ qua ${res.data.skipped}` : "")
       );
       loadOrders();
     } else {
-      alert(res.error || "Cập nhật hàng loạt thất bại");
+      toast.error(res.error || "Cập nhật hàng loạt thất bại");
     }
   };
 

@@ -8,6 +8,7 @@ import { Card, Badge, Button } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatPrice } from "@/lib/utils";
 import { Promotion } from "@/types";
+import { toast } from "@/lib/feedback";
 
 type Voucher = {
   id: string;
@@ -53,7 +54,7 @@ export function PromotionCarousel() {
       setCopied(code);
       setTimeout(() => setCopied(null), 2000);
     } catch {
-      alert(`Mã của bạn: ${code}`);
+      toast.info(`Mã của bạn: ${code}`, "Sao chép thủ công");
     }
   };
 

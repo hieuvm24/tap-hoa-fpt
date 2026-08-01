@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { Product, Review } from "@/types";
+import { toast } from "@/lib/feedback";
 
 function ProductDetailContent({ slug }: { slug: string }) {
   const [product, setProduct] = useState<Product | null>(null);
@@ -86,7 +87,7 @@ function ProductDetailContent({ slug }: { slug: string }) {
       setRating(5);
       reloadProduct();
     } else {
-      alert(res.error || "Không gửi được đánh giá");
+      toast.error(res.error || "Không gửi được đánh giá");
     }
   };
 

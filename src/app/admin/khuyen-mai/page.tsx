@@ -6,6 +6,7 @@ import { Card, Badge, Button, Input, Textarea, Modal, ImageUpload } from "@/comp
 import { api } from "@/lib/api";
 import type { Category, Promotion } from "@/types";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { confirmDialog, toast } from "@/lib/feedback";
 
 type FormState = {
   title: string;
@@ -70,7 +71,7 @@ export default function AdminPromotionsPage() {
 
   const handleSave = async () => {
     if (!form.image) {
-      alert("Vui lòng chọn ảnh khuyến mãi");
+      toast.warning("Vui lòng chọn ảnh khuyến mãi");
       return;
     }
     setSaving(true);
@@ -91,9 +92,18 @@ export default function AdminPromotionsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xóa khuyến mãi này?")) return;
-    await api.promotions.delete(id);
-    load();
+    const ok = await confirmDialog({
+      title: "Xóa khuyến mãi",
+      message: "Khuyến mãi này sẽ bị xóa khỏi trang chủ và danh sách.",
+      variant: "danger",
+      confirmText: "Xóa khuyến mãi",
+    });
+    if (!ok) return;
+    const res = await api.promotions.delete(id);
+    if (res.success) {
+      toast.success("Đã xóa khuyến mãi");
+      load();
+    } else toast.error(res.error || "Không xóa được");
   };
 
   const ruleLabel = (p: Promotion) => {

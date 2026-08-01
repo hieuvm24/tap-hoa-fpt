@@ -11,6 +11,7 @@ import { Product } from "@/types";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { isOwner } from "@/lib/permissions";
+import { confirmDialog, promptDialog, toast } from "@/lib/feedback";
 
 export function ProductTable() {
   const { user } = useAuth();
@@ -62,35 +63,58 @@ export function ProductTable() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xóa sản phẩm này?")) return;
-    await api.products.delete(id);
-    loadProducts();
+    const ok = await confirmDialog({
+      title: "Xóa sản phẩm",
+      message: "Sản phẩm sẽ bị xóa khỏi cửa hàng. Thao tác này không hoàn tác.",
+      variant: "danger",
+      confirmText: "Xóa sản phẩm",
+    });
+    if (!ok) return;
+    const res = await api.products.delete(id);
+    if (res.success) {
+      toast.success("Đã xóa sản phẩm");
+      loadProducts();
+    } else toast.error(res.error || "Không xóa được sản phẩm");
   };
 
   const handleRestock = async (product: Product) => {
-    const raw = prompt(
-      `Nhập thêm tồn cho "${product.name}" (hiện còn ${product.stock}). Ví dụ: 20`,
-      "20"
-    );
+    const raw = await promptDialog({
+      title: "Nhập thêm tồn kho",
+      message: `"${product.name}" — hiện còn ${product.stock}. Nhập số lượng cần cộng thêm (có thể âm để trừ).`,
+      defaultValue: "20",
+      placeholder: "Ví dụ: 20",
+      inputType: "number",
+      confirmText: "Cập nhật tồn",
+      validate: (v) => {
+        const n = parseInt(v, 10);
+        if (!Number.isFinite(n) || n === 0) return "Số lượng không hợp lệ";
+        return null;
+      },
+    });
     if (raw == null) return;
     const delta = parseInt(raw, 10);
-    if (!Number.isFinite(delta) || delta === 0) {
-      alert("Số lượng không hợp lệ");
-      return;
-    }
     const res = await api.products.adjustStock(product.id, {
       delta,
       reason: "Nhập hàng nhanh",
     });
-    if (res.success) loadProducts();
-    else alert(res.error || "Cập nhật tồn thất bại");
+    if (res.success) {
+      toast.success(`Đã cập nhật tồn (+${delta})`);
+      loadProducts();
+    } else toast.error(res.error || "Cập nhật tồn thất bại");
   };
 
   const handleDuplicate = async (product: Product) => {
-    if (!confirm(`Nhân bản "${product.name}"?`)) return;
+    const ok = await confirmDialog({
+      title: "Nhân bản sản phẩm",
+      message: `Tạo bản sao của "${product.name}"?`,
+      confirmText: "Nhân bản",
+    });
+    if (!ok) return;
     const res = await api.products.duplicate(product.id);
-    if (res.success) loadProducts();
-    else alert(res.error || "Nhân bản thất bại");
+    if (res.success) {
+      toast.success("Đã nhân bản sản phẩm");
+      loadProducts();
+    } else toast.error(res.error || "Nhân bản thất bại");
   };
 
   const handleSaved = () => {

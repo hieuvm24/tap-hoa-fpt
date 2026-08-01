@@ -6,6 +6,7 @@ export { Textarea } from "./Textarea";
 export { Badge } from "./Badge";
 export { Skeleton, ProductCardSkeleton } from "./Skeleton";
 export { Modal } from "./Modal";
+export { FeedbackHost } from "./FeedbackHost";
 export { StarRating } from "./StarRating";
 export { BarChart, HorizontalBarChart } from "./Chart";
 export { ImageUpload } from "./ImageUpload";

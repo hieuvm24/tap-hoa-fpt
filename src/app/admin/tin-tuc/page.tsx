@@ -6,6 +6,7 @@ import { Card, Badge, Button, Input, Textarea, Modal, ImageUpload } from "@/comp
 import { api } from "@/lib/api";
 import type { NewsArticle } from "@/types";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { confirmDialog, toast } from "@/lib/feedback";
 
 export default function AdminNewsPage() {
   const [news, setNews] = useState<NewsArticle[]>([]);
@@ -59,7 +60,7 @@ export default function AdminNewsPage() {
 
   const handleSave = async () => {
     if (!form.image) {
-      alert("Vui lòng chọn ảnh bài viết");
+      toast.warning("Vui lòng chọn ảnh bài viết");
       return;
     }
     setSaving(true);
@@ -71,9 +72,18 @@ export default function AdminNewsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xóa bài viết?")) return;
-    await api.news.delete(id);
-    load();
+    const ok = await confirmDialog({
+      title: "Xóa bài viết",
+      message: "Bài viết sẽ bị xóa vĩnh viễn khỏi trang tin tức.",
+      variant: "danger",
+      confirmText: "Xóa bài viết",
+    });
+    if (!ok) return;
+    const res = await api.news.delete(id);
+    if (res.success) {
+      toast.success("Đã xóa bài viết");
+      load();
+    } else toast.error(res.error || "Không xóa được");
   };
 
   return (

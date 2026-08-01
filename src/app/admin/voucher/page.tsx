@@ -5,6 +5,7 @@ import { Card, Badge, Button, Input, Modal } from "@/components/ui";
 import { api } from "@/lib/api";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { confirmDialog, toast } from "@/lib/feedback";
 
 type Voucher = {
   id: string;
@@ -71,9 +72,18 @@ export default function AdminVouchersPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xóa voucher này?")) return;
-    await api.vouchers.delete(id);
-    load();
+    const ok = await confirmDialog({
+      title: "Xóa voucher",
+      message: "Voucher sẽ bị xóa vĩnh viễn. Khách không thể dùng mã này nữa.",
+      variant: "danger",
+      confirmText: "Xóa voucher",
+    });
+    if (!ok) return;
+    const res = await api.vouchers.delete(id);
+    if (res.success) {
+      toast.success("Đã xóa voucher");
+      load();
+    } else toast.error(res.error || "Không xóa được voucher");
   };
 
   return (

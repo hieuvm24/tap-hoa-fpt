@@ -5,6 +5,7 @@ import { Card, Button, StarRating } from "@/components/ui";
 import { api } from "@/lib/api";
 import { Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { confirmDialog, toast } from "@/lib/feedback";
 
 type AdminReview = {
   id: string;
@@ -37,10 +38,18 @@ export default function AdminReviewsPage() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xóa đánh giá này?")) return;
+    const ok = await confirmDialog({
+      title: "Xóa đánh giá",
+      message: "Đánh giá này sẽ bị xóa khỏi sản phẩm.",
+      variant: "danger",
+      confirmText: "Xóa đánh giá",
+    });
+    if (!ok) return;
     const res = await api.reviews.delete(id);
-    if (res.success) load();
-    else alert(res.error || "Không xóa được");
+    if (res.success) {
+      toast.success("Đã xóa đánh giá");
+      load();
+    } else toast.error(res.error || "Không xóa được");
   };
 
   return (

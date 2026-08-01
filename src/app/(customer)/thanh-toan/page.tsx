@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { FREE_SHIP_THRESHOLD, SHIPPING_FEE, DEFAULT_STORE } from "@/config/defaults";
 import { calcPromotionDiscount } from "@/lib/promotions";
 import type { Address, Promotion, StoreInfo } from "@/types";
+import { confirmDialog, toast } from "@/lib/feedback";
 
 type PaymentMethod = "cod" | "transfer" | "vnpay";
 type Fulfillment = "delivery" | "pickup";
@@ -119,9 +120,13 @@ function CheckoutContent() {
 
     const sync = await syncFromServer();
     if (sync.warnings.length) {
-      const cont = confirm(
-        sync.warnings.join("\n") + "\n\nTiếp tục đặt hàng với giỏ đã cập nhật?"
-      );
+      const cont = await confirmDialog({
+        title: "Giỏ hàng đã thay đổi",
+        message:
+          sync.warnings.join("\n") +
+          "\n\nTiếp tục đặt hàng với giỏ đã cập nhật?",
+        confirmText: "Tiếp tục đặt hàng",
+      });
       if (!cont) {
         setIsSubmitting(false);
         return;
@@ -141,7 +146,7 @@ function CheckoutContent() {
 
     if (!orderItems.length) {
       setIsSubmitting(false);
-      alert("Giỏ hàng trống hoặc hết hàng. Vui lòng chọn lại sản phẩm.");
+      toast.warning("Giỏ hàng trống hoặc hết hàng. Vui lòng chọn lại sản phẩm.");
       return;
     }
 
@@ -162,7 +167,7 @@ function CheckoutContent() {
 
     if (!res.success || !res.data) {
       setIsSubmitting(false);
-      alert(res.error || "Đặt hàng thất bại");
+      toast.error(res.error || "Đặt hàng thất bại");
       return;
     }
 
@@ -176,7 +181,7 @@ function CheckoutContent() {
         window.location.href = pay.data.paymentUrl;
         return;
       }
-      alert(
+      toast.warning(
         pay.error ||
           "Không tạo được link VNPay. Đơn đã được lưu — bạn có thể thanh toán sau hoặc chọn COD."
       );

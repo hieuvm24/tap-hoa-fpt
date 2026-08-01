@@ -5,6 +5,7 @@ import { Card, Badge, Button, Input, Modal } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Category } from "@/types";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { confirmDialog, toast } from "@/lib/feedback";
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -54,10 +55,18 @@ export default function AdminCategoriesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xóa danh mục này?")) return;
+    const ok = await confirmDialog({
+      title: "Xóa danh mục",
+      message: "Xóa danh mục này? Chỉ xóa được khi không còn sản phẩm.",
+      variant: "danger",
+      confirmText: "Xóa danh mục",
+    });
+    if (!ok) return;
     const res = await api.categories.delete(id);
-    if (!res.success) alert(res.error || "Không xóa được");
-    load();
+    if (res.success) {
+      toast.success("Đã xóa danh mục");
+      load();
+    } else toast.error(res.error || "Không xóa được");
   };
 
   return (

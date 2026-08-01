@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/utils";
 import { Button, Card, Input } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Product } from "@/types";
+import { toast } from "@/lib/feedback";
 
 type Line = {
   product: Product;
@@ -110,7 +111,7 @@ export default function PosPage() {
     if (!lines.length) return;
     const phone = customerPhone.trim() || "0000000000";
     if (!customerName.trim()) {
-      alert("Nhập tên khách (hoặc giữ Khách lẻ)");
+      toast.warning("Nhập tên khách (hoặc giữ Khách lẻ)");
       return;
     }
     setSubmitting(true);
@@ -128,7 +129,7 @@ export default function PosPage() {
     });
     setSubmitting(false);
     if (!res.success || !res.data) {
-      alert(res.error || "Không tạo được hóa đơn");
+      toast.error(res.error || "Không tạo được hóa đơn");
       return;
     }
     setLastOrder({ id: res.data.id, orderCode: res.data.orderCode });
@@ -136,6 +137,7 @@ export default function PosPage() {
     setCustomerName("Khách lẻ");
     setCustomerPhone("");
     setMatchedCustomer(null);
+    toast.success(`Đã tạo hóa đơn ${res.data.orderCode}`);
   };
 
   return (

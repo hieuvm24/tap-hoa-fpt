@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Input, Textarea, Button, Modal, ImageUpload } from "@/components/ui";
 import { Product, Category } from "@/types";
 import { api } from "@/lib/api";
+import { toast } from "@/lib/feedback";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -65,7 +66,7 @@ export function ProductModal({ isOpen, onClose, product, onSaved }: ProductModal
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.image) {
-      alert("Vui lòng chọn ảnh sản phẩm");
+      toast.warning("Vui lòng chọn ảnh sản phẩm");
       return;
     }
     setLoading(true);
@@ -77,8 +78,10 @@ export function ProductModal({ isOpen, onClose, product, onSaved }: ProductModal
       : await api.products.create(payload);
 
     setLoading(false);
-    if (res.success) onSaved();
-    else alert(res.error || "Lỗi lưu sản phẩm");
+    if (res.success) {
+      toast.success(isEdit ? "Đã cập nhật sản phẩm" : "Đã thêm sản phẩm");
+      onSaved();
+    } else toast.error(res.error || "Lỗi lưu sản phẩm");
   };
 
   return (

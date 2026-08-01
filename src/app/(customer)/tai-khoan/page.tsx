@@ -22,6 +22,7 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 import { formatPrice, formatDate, cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { Address, Order } from "@/types";
+import { confirmDialog, toast } from "@/lib/feedback";
 
 const tabs = [
   { id: "profile", label: "Thông tin cá nhân", icon: User },
@@ -118,7 +119,7 @@ function AccountContent() {
       setEditingAddrId(null);
       loadAddresses();
     } else {
-      alert(res.error || "Không lưu được địa chỉ");
+      toast.error(res.error || "Không lưu được địa chỉ");
     }
   };
 
@@ -134,9 +135,18 @@ function AccountContent() {
   };
 
   const handleDeleteAddress = async (id: string) => {
-    if (!confirm("Xóa địa chỉ này?")) return;
-    await api.addresses.delete(id);
-    loadAddresses();
+    const ok = await confirmDialog({
+      title: "Xóa địa chỉ",
+      message: "Bạn có chắc muốn xóa địa chỉ này?",
+      variant: "danger",
+      confirmText: "Xóa địa chỉ",
+    });
+    if (!ok) return;
+    const res = await api.addresses.delete(id);
+    if (res.success) {
+      toast.success("Đã xóa địa chỉ");
+      loadAddresses();
+    } else toast.error(res.error || "Không xóa được địa chỉ");
   };
 
   const handleChangePassword = async () => {
@@ -461,7 +471,7 @@ function AccountContent() {
                       setNotifyPrefs(res.data.prefs);
                       setNotifySaved(true);
                     } else {
-                      alert(res.error || "Không lưu được");
+                      toast.error(res.error || "Không lưu được");
                     }
                   }}
                 >

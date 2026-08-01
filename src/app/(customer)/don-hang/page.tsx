@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
+import { confirmDialog, toast } from "@/lib/feedback";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/types";
@@ -328,7 +329,7 @@ function OrdersContent() {
                           if (res.success && res.data?.paymentUrl) {
                             window.location.href = res.data.paymentUrl;
                           } else {
-                            alert(res.error || "Không tạo được link VNPay");
+                            toast.error(res.error || "Không tạo được link VNPay");
                           }
                         }}
                       >
@@ -342,12 +343,12 @@ function OrdersContent() {
                       onClick={async () => {
                         const res = await api.orders.reorder(selectedOrder.id);
                         if (!res.success || !res.data) {
-                          alert(res.error || "Không mua lại được");
+                          toast.error(res.error || "Không mua lại được");
                           return;
                         }
                         const { items, unavailable } = res.data;
                         if (unavailable.length) {
-                          alert(
+                          toast.warning(
                             `Một số SP không còn: ${unavailable
                               .map((u) => u.name)
                               .join(", ")}`
@@ -390,7 +391,14 @@ function OrdersContent() {
                         size="sm"
                         className="text-red-600 border-red-200 hover:bg-red-50"
                         onClick={async () => {
-                          if (!confirm("Bạn chắc chắn muốn hủy đơn này?")) return;
+                          const ok = await confirmDialog({
+                            title: "Hủy đơn hàng",
+                            message:
+                              "Bạn chắc chắn muốn hủy đơn này? Thao tác không hoàn tác.",
+                            variant: "danger",
+                            confirmText: "Hủy đơn",
+                          });
+                          if (!ok) return;
                           const res = await api.orders.cancel(
                             selectedOrder.id,
                             undefined,
@@ -409,8 +417,9 @@ function OrdersContent() {
                               )
                             );
                             setSelectedOrder(res.data);
+                            toast.success("Đã hủy đơn hàng");
                           } else {
-                            alert(res.error || "Không hủy được đơn");
+                            toast.error(res.error || "Không hủy được đơn");
                           }
                         }}
                       >

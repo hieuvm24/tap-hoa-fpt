@@ -9,6 +9,7 @@ import { Badge, Button, Card } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatPrice } from "@/lib/utils";
 import { Promotion } from "@/types";
+import { toast } from "@/lib/feedback";
 
 type Voucher = {
   id: string;
@@ -38,7 +39,7 @@ export default function PromotionsPage() {
       setCopied(code);
       setTimeout(() => setCopied(null), 2000);
     } catch {
-      alert(`Mã: ${code}`);
+      toast.info(`Mã voucher: ${code}`, "Sao chép thủ công");
     }
   };
 
