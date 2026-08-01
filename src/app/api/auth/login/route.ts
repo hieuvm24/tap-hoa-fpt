@@ -61,6 +61,17 @@ export async function POST(req: NextRequest) {
       return apiError("Email hoặc mật khẩu không đúng", 401);
     }
 
+    if (
+      user.authProvider === "credentials" &&
+      !user.emailVerified &&
+      user.role === "CUSTOMER"
+    ) {
+      return apiError(
+        "Email chưa xác nhận. Nhập mã đã gửi tới hộp thư (hoặc gửi lại mã).",
+        403
+      );
+    }
+
     const token = await createToken({
       userId: user.id,
       email: user.email,

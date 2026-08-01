@@ -113,10 +113,19 @@ Kiểm tra trên GitHub: thấy code, **không** thấy `.env`.
 | `CLOUDINARY_CLOUD_NAME` | Cloud name Bước 2 | |
 | `CLOUDINARY_API_KEY` | API Key Bước 2 | |
 | `CLOUDINARY_API_SECRET` | API Secret Bước 2 | |
-| `RESEND_API_KEY` | Key từ [resend.com](https://resend.com) | Quên mật khẩu (khuyên dùng) |
+| `RESEND_API_KEY` | Key từ [resend.com](https://resend.com) | Quên MK + mã xác nhận đăng ký |
 | `MAIL_FROM` | VD `Tạp Hóa FPT <onboarding@resend.dev>` | Tuỳ chọn |
+| `GOOGLE_CLIENT_ID` | Google Cloud → OAuth Web Client | Đăng nhập Google |
+| `GOOGLE_CLIENT_SECRET` | Cùng client | |
+| `FACEBOOK_APP_ID` | Meta Developers → App ID | Đăng nhập Facebook |
+| `FACEBOOK_APP_SECRET` | App Secret | |
 
 Hoặc thay Resend bằng SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`.
+
+**Redirect URI bắt buộc** (điền đúng URL Vercel):
+
+- Google: `https://YOUR.vercel.app/api/auth/oauth/google/callback`
+- Facebook: `https://YOUR.vercel.app/api/auth/oauth/facebook/callback`
 
 Chọn môi trường: tích **Production**, **Preview**, **Development** (hoặc ít nhất Production).
 

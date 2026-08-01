@@ -85,6 +85,7 @@ async function main() {
   await prisma.review.deleteMany();
   await prisma.wishlistItem.deleteMany();
   await prisma.passwordResetToken.deleteMany();
+  await prisma.emailVerificationToken.deleteMany();
   await prisma.product.deleteMany();
   await prisma.category.deleteMany();
   await prisma.promotion.deleteMany();
@@ -138,6 +139,7 @@ async function main() {
         name: c.name,
         phone: c.phone,
         role: "CUSTOMER",
+        emailVerified: true,
         avatar: avatarPool[i % avatarPool.length],
       },
     });
@@ -151,6 +153,7 @@ async function main() {
       name: "Chủ cửa hàng FPT",
       phone: "0388025515",
       role: "OWNER",
+      emailVerified: true,
       avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
     },
   });
@@ -162,6 +165,7 @@ async function main() {
       name: "Nhân viên Minh",
       phone: "0912345678",
       role: "STAFF",
+      emailVerified: true,
       avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
     },
   });

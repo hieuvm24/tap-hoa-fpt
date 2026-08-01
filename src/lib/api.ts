@@ -74,10 +74,37 @@ export const api = {
         { method: "POST", body: JSON.stringify({ email, password }) }
       ),
     register: (data: import("@/types/auth").RegisterData) =>
-      request<{ user: import("@/types/auth").AuthUser }>("/auth/register", {
+      request<{
+        user?: import("@/types/auth").AuthUser;
+        needsVerification?: boolean;
+        email?: string;
+        emailed?: boolean;
+        message?: string;
+        demoCode?: string;
+      }>("/auth/register", {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    verifyEmail: (email: string, code: string) =>
+      request<{
+        user: import("@/types/auth").AuthUser;
+        verified: boolean;
+      }>("/auth/verify-email", {
+        method: "POST",
+        body: JSON.stringify({ email, code }),
+      }),
+    resendVerification: (email: string) =>
+      request<{
+        sent: boolean;
+        emailed?: boolean;
+        message?: string;
+        demoCode?: string;
+      }>("/auth/verify-email", {
+        method: "PUT",
+        body: JSON.stringify({ email }),
+      }),
+    oauthProviders: () =>
+      request<{ google: boolean; facebook: boolean }>("/auth/oauth/providers"),
     logout: () => request("/auth/logout", { method: "POST" }),
     me: () =>
       request<{ user: import("@/types/auth").AuthUser }>("/auth/me"),

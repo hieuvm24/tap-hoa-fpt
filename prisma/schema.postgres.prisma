@@ -8,24 +8,27 @@ datasource db {
 }
 
 model User {
-  id           String              @id @default(cuid())
-  email        String              @unique
-  password     String
-  name         String
-  phone        String?
-  avatar       String?
-  role         String              @default("CUSTOMER")
+  id            String                   @id @default(cuid())
+  email         String                   @unique
+  password      String
+  name          String
+  phone         String?
+  avatar        String?
+  role          String                   @default("CUSTOMER")
   /// credentials | google | facebook
-  authProvider String              @default("credentials")
-  providerId   String?
+  authProvider  String                   @default("credentials")
+  providerId    String?
+  /// Mặc định true để user cũ không bị khóa; đăng ký mới set false đến khi xác nhận mã
+  emailVerified Boolean                  @default(true)
   /// JSON: { order: boolean, promo: boolean, news: boolean }
-  notifyPrefs  String              @default("{\"order\":true,\"promo\":true,\"news\":true}")
-  createdAt    DateTime            @default(now())
-  orders       Order[]
-  reviews      Review[]
-  addresses    Address[]
-  wishlist     WishlistItem[]
-  resetTokens  PasswordResetToken[]
+  notifyPrefs   String                   @default("{\"order\":true,\"promo\":true,\"news\":true}")
+  createdAt     DateTime                 @default(now())
+  orders        Order[]
+  reviews       Review[]
+  addresses     Address[]
+  wishlist      WishlistItem[]
+  resetTokens   PasswordResetToken[]
+  verifyTokens  EmailVerificationToken[]
   supportThreads SupportThread[]
 
   @@index([authProvider, providerId])
@@ -39,6 +42,18 @@ model PasswordResetToken {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, code])
 }
 
 model Address {

@@ -15,6 +15,44 @@ function escapeHtml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
+export function buildEmailVerificationEmail(opts: {
+  storeName: string;
+  userName: string;
+  code: string;
+}) {
+  const { storeName, userName, code } = opts;
+  const subject = `[${storeName}] Mã xác nhận email`;
+  const text = [
+    `Xin chào ${userName},`,
+    "",
+    `Mã xác nhận đăng ký tài khoản tại ${storeName}:`,
+    code,
+    "",
+    "Mã có hiệu lực trong 30 phút. Nếu bạn không đăng ký, hãy bỏ qua email này.",
+  ].join("\n");
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="font-family:system-ui,sans-serif;line-height:1.5;color:#111;background:#f8fafc;padding:24px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:12px;padding:28px;border:1px solid #e5e7eb">
+    <h1 style="font-size:18px;margin:0 0 12px;color:#16a34a">${escapeHtml(storeName)}</h1>
+    <p>Xin chào <strong>${escapeHtml(userName)}</strong>,</p>
+    <p>Nhập mã sau để xác nhận email đăng ký (hiệu lực <strong>30 phút</strong>):</p>
+    <p style="text-align:center;margin:28px 0">
+      <span style="display:inline-block;letter-spacing:6px;font-size:28px;font-weight:700;background:#f0fdf4;color:#166534;padding:12px 20px;border-radius:10px;border:1px solid #bbf7d0">
+        ${escapeHtml(code)}
+      </span>
+    </p>
+    <p style="font-size:13px;color:#9ca3af;margin-top:24px">
+      Nếu bạn không đăng ký, hãy bỏ qua email này.
+    </p>
+  </div>
+</body>
+</html>`;
+
+  return { subject, text, html };
+}
+
 export function buildPasswordResetEmail(opts: {
   storeName: string;
   userName: string;

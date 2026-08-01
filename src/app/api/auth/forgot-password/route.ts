@@ -136,15 +136,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!emailed && !isMailConfigured() && !allowResetUrlInResponse()) {
-    // Production chưa cấu hình mail
-    console.error(
-      "[forgot-password] MAIL not configured (RESEND_API_KEY or SMTP_*)"
+  // Chưa cấu hình mail (kể cả production/đồ án): vẫn trả link để không chặn demo
+  if (!emailed && !isMailConfigured()) {
+    console.warn(
+      "[forgot-password] MAIL not configured — returning reset link for demo"
     );
-    return apiError(
-      "Hệ thống chưa cấu hình gửi email. Liên hệ cửa hàng để hỗ trợ.",
-      503
-    );
+    return apiSuccess({
+      sent: true,
+      emailed: false,
+      demo: true,
+      message:
+        "Chưa cấu hình gửi email (RESEND_API_KEY hoặc SMTP_*). Dùng link bên dưới để đặt lại mật khẩu.",
+      resetUrl,
+    });
   }
 
   return apiSuccess({

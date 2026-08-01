@@ -1,28 +1,13 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { createToken, setAuthCookie, hashPassword } from "@/lib/auth-server";
+import { hashPassword } from "@/lib/auth-server";
 import { apiSuccess, apiError } from "@/lib/mappers";
 import { rateLimit } from "@/lib/rate-limit";
-
-function toAuthUser(user: {
-  id: string;
-  name: string;
-  email: string;
-  phone: string | null;
-  avatar: string | null;
-  role: string;
-  createdAt: Date;
-}) {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone || undefined,
-    avatar: user.avatar || undefined,
-    role: user.role as import("@/types/auth").UserRole,
-    createdAt: user.createdAt.toISOString().split("T")[0],
-  };
-}
+import {
+  allowAuthDemoSecrets,
+  issueEmailVerificationCode,
+  sendVerificationEmail,
+} from "@/lib/email-verify";
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,6 +25,10 @@ export async function POST(req: NextRequest) {
       return apiError("Số điện thoại không hợp lệ (10 số, bắt đầu 0)");
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) {
+      return apiError("Email không hợp lệ");
+    }
+
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("x-real-ip") ||
@@ -49,34 +38,65 @@ export async function POST(req: NextRequest) {
       return apiError("Đăng ký quá nhiều lần. Thử lại sau.", 429);
     }
 
+    const emailKey = String(email).toLowerCase().trim();
     const existing = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: emailKey },
     });
 
-    if (existing) {
+    if (existing?.emailVerified) {
       return apiError("Email đã được sử dụng");
     }
 
     const hashed = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: {
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        phone: phone.trim(),
-        password: hashed,
-        role: "CUSTOMER",
-      },
-    });
+    let user;
+    if (existing && !existing.emailVerified) {
+      user = await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: name.trim(),
+          phone: phone.trim(),
+          password: hashed,
+          authProvider: "credentials",
+          providerId: null,
+        },
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          name: name.trim(),
+          email: emailKey,
+          phone: phone.trim(),
+          password: hashed,
+          role: "CUSTOMER",
+          authProvider: "credentials",
+          emailVerified: false,
+        },
+      });
+    }
 
-    const token = await createToken({
-      userId: user.id,
+    const { code } = await issueEmailVerificationCode(user.id);
+    const mail = await sendVerificationEmail({
       email: user.email,
-      role: user.role as import("@/types/auth").UserRole,
+      userName: user.name,
+      code,
     });
-    await setAuthCookie(token);
 
-    return apiSuccess({ user: toAuthUser(user) }, 201);
-  } catch {
+    const demo = allowAuthDemoSecrets() || !mail.emailed;
+
+    return apiSuccess(
+      {
+        needsVerification: true,
+        email: user.email,
+        emailed: mail.emailed,
+        message: mail.emailed
+          ? "Đã gửi mã xác nhận tới email. Nhập mã để hoàn tất đăng ký."
+          : "Chưa gửi được email — dùng mã demo bên dưới (đồ án / chưa cấu hình mail).",
+        ...(demo ? { demoCode: code } : {}),
+      },
+      201
+    );
+  } catch (e) {
+    console.error("[register]", e);
     return apiError("Đăng ký thất bại", 500);
   }
 }
