@@ -9,6 +9,8 @@ export interface ChatMessage {
   content: string;
   products?: Product[];
   timestamp: Date;
+  /** openai = GPT; rules = kịch bản sẵn */
+  source?: "openai" | "rules";
 }
 
 export interface QuickReply {

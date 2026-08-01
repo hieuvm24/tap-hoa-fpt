@@ -36,13 +36,15 @@ type StaffMsg = {
 function createMessage(
   role: "user" | "bot",
   content: string,
-  products?: ChatMessage["products"]
+  products?: ChatMessage["products"],
+  source?: ChatMessage["source"]
 ): ChatMessage {
   return {
     id: `${Date.now()}-${Math.random()}`,
     role,
     content,
     products,
+    source,
     timestamp: new Date(),
   };
 }
@@ -123,7 +125,12 @@ export function ChatBot() {
     if (res.success && res.data) {
       setMessages((prev) => [
         ...prev,
-        createMessage("bot", res.data!.text, res.data!.products),
+        createMessage(
+          "bot",
+          res.data!.text,
+          res.data!.products,
+          res.data!.source
+        ),
       ]);
     } else {
       setMessages((prev) => [
@@ -315,6 +322,13 @@ export function ChatBot() {
                         )}
                       >
                         {renderContent(msg.content)}
+                        {msg.role === "bot" && msg.source && (
+                          <p className="mt-1.5 text-[10px] text-gray-400">
+                            {msg.source === "openai"
+                              ? "Trả lời bởi OpenAI"
+                              : "Trả lời theo kịch bản sẵn"}
+                          </p>
+                        )}
                         {msg.products && msg.products.length > 0 && (
                           <div className="mt-2 space-y-2">
                             {msg.products.map((p) => (

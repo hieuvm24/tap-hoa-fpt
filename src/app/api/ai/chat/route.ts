@@ -80,5 +80,11 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  if (result.source === "rules" && !process.env.OPENAI_API_KEY?.trim()) {
+    console.warn(
+      "[ai/chat] Đang dùng rule-based — thêm OPENAI_API_KEY trên Vercel để bật GPT"
+    );
+  }
+
   return apiSuccess(result);
 }

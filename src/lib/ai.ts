@@ -128,17 +128,21 @@ async function callOpenAI(
   history: { role: "user" | "assistant"; content: string }[],
   ctx: AiChatContext
 ): Promise<string | null> {
-  if (!OPENAI_API_KEY) return null;
+  if (!OPENAI_API_KEY?.trim()) {
+    console.warn("[ai] OPENAI_API_KEY chưa cấu hình — dùng rule-based");
+    return null;
+  }
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY.trim()}`,
       },
       body: JSON.stringify({
         model: OPENAI_MODEL,
-        temperature: 0.3,
+        temperature: 0.4,
+        max_tokens: 500,
         messages: [
           { role: "system", content: buildSystemPrompt(ctx) },
           ...history.slice(-8),
@@ -146,10 +150,21 @@ async function callOpenAI(
         ],
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      console.error(
+        "[ai] OpenAI HTTP",
+        res.status,
+        errBody.slice(0, 300)
+      );
+      return null;
+    }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || null;
-  } catch {
+    const text = data.choices?.[0]?.message?.content?.trim() || null;
+    if (!text) console.warn("[ai] OpenAI trả về rỗng");
+    return text;
+  } catch (e) {
+    console.error("[ai] OpenAI fetch error", e);
     return null;
   }
 }
@@ -463,33 +478,20 @@ function ruleBasedReply(message: string, ctx: AiChatContext): AiChatResult {
   };
 }
 
-function isFallbackHelp(text: string) {
-  return (
-    text.includes("Anh/chị hỏi kiểu này") ||
-    text.includes("Anh/chị có thể hỏi")
-  );
-}
-
 export async function generateAiReply(input: {
   message: string;
   history?: { role: "user" | "assistant"; content: string }[];
   context: AiChatContext;
 }): Promise<AiChatResult> {
-  const ruled = ruleBasedReply(input.message, input.context);
-
-  // FAQ / tìm được hàng → dùng rule (đúng số liệu)
-  if (!isFallbackHelp(ruled.text)) {
-    return ruled;
-  }
-
-  // Câu tự do → OpenAI nếu có key
+  // Có OPENAI_API_KEY → ưu tiên GPT (đồ án: tích hợp OpenAI thật)
+  // Rule-based chỉ dùng khi không có key hoặc API lỗi
   const openaiText = await callOpenAI(
     input.message,
     input.history || [],
     input.context
   );
   if (openaiText) {
-    const products = findProducts(input.message, input.context.products, 3);
+    const products = findProducts(input.message, input.context.products, 4);
     return {
       text: openaiText,
       products: products.length ? products : undefined,
@@ -497,5 +499,5 @@ export async function generateAiReply(input: {
     };
   }
 
-  return ruled;
+  return ruleBasedReply(input.message, input.context);
 }
