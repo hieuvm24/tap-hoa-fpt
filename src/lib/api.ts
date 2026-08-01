@@ -380,21 +380,6 @@ export const api = {
     },
   },
 
-  ai: {
-    chat: (
-      message: string,
-      history?: { role: "user" | "assistant"; content: string }[]
-    ) =>
-      request<{
-        text: string;
-        products?: import("@/types").Product[];
-        source: "openai" | "rules";
-      }>("/ai/chat", {
-        method: "POST",
-        body: JSON.stringify({ message, history }),
-      }),
-  },
-
   support: {
     myThread: () =>
       request<{

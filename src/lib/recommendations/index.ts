@@ -1,6 +1,5 @@
 export { CATEGORY_PAIRS, relatedCategories } from "./categories";
 export { trackRecentlyViewed, getRecentIds } from "./recent";
-export { searchProductsByKeyword } from "./search";
 export {
   getSimilarProducts,
   getFrequentlyBoughtTogether,

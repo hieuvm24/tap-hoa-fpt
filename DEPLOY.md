@@ -113,8 +113,6 @@ Kiểm tra trên GitHub: thấy code, **không** thấy `.env`.
 | `CLOUDINARY_CLOUD_NAME` | Cloud name Bước 2 | |
 | `CLOUDINARY_API_KEY` | API Key Bước 2 | |
 | `CLOUDINARY_API_SECRET` | API Secret Bước 2 | |
-| `OPENAI_API_KEY` | Key từ [platform.openai.com](https://platform.openai.com/api-keys) | Chat AI (GPT) |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Tuỳ chọn |
 | `RESEND_API_KEY` | Key từ [resend.com](https://resend.com) | Quên mật khẩu (khuyên dùng) |
 | `MAIL_FROM` | VD `Tạp Hóa FPT <onboarding@resend.dev>` | Tuỳ chọn |
 
