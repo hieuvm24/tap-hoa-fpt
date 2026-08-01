@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "tsx scripts/use-db.ts postgres && prisma generate && prisma db push && next build",
+    "build": "tsx scripts/use-db.ts postgres && prisma generate && prisma db push --accept-data-loss && next build",
     "build:local": "tsx scripts/use-db.ts sqlite && prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
